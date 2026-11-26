@@ -422,7 +422,6 @@ function App() {
             >
               {theme === 'dark' ? <SunIcon size={14} /> : <MoonIcon size={14} />}
             </button>
-            <span className="local-pill"><CheckIcon size={12} /> local</span>
           </div>
         </div>
 

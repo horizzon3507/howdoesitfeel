@@ -98,17 +98,6 @@
   background: var(--control-hover);
 }
 
-.local-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border: 1px solid #238636;
-  border-radius: 999px;
-  color: #3fb950;
-  font-size: 11px;
-  font-weight: 600;
-}
 
 .side-actions {
   display: grid;
