@@ -50,7 +50,22 @@ import {
 } from './fsUtils'
 import { renderMarkdown } from './markdown'
 import { loadWorkspace, resetWorkspace, saveWorkspace } from './storage'
+import {
+  codeOfConductTemplate,
+  contributingTemplate,
+  issueTemplate,
+  mitLicense,
+  pullRequestTemplate,
+} from './templates'
 import type { TreeNode, Workspace, WorkspaceEntry } from './types'
+
+const templateFiles = [
+  ['LICENSE', mitLicense],
+  ['CONTRIBUTING.md', contributingTemplate],
+  ['CODE_OF_CONDUCT.md', codeOfConductTemplate],
+  ['.github/pull_request_template.md', pullRequestTemplate],
+  ['.github/ISSUE_TEMPLATE/bug_report.md', issueTemplate],
+] as const
 
 async function entryFromFile(file: File, forcedPath?: string): Promise<WorkspaceEntry> {
   const path = normalizePath(forcedPath || file.webkitRelativePath || file.name)
@@ -165,6 +180,23 @@ function App() {
     mutate((draft) => deletePath(draft, path))
   }
 
+  function addTemplate(path: string, content: string) {
+    mutate((draft) => {
+      const finalPath = draft[path] ? uniquePath(draft, path) : path
+      createFile(draft, finalPath, content, guessMime(finalPath))
+      setSelectedPath(finalPath)
+      setMode('preview')
+    })
+  }
+
+  function addCommunityFiles() {
+    mutate((draft) => {
+      for (const [path, content] of templateFiles) {
+        if (!draft[path]) createFile(draft, path, content, guessMime(path))
+      }
+    })
+  }
+
   async function importFiles(files: FileList | null) {
     if (!files?.length || !workspace) return
     const entries = await Promise.all(Array.from(files).map((file) => entryFromFile(file)))
@@ -258,6 +290,15 @@ function App() {
           <button type="button" onClick={() => folderInput.current?.click()}><UploadIcon size={14} /> Pasta</button>
         </div>
 
+        <details className="template-menu">
+          <summary><PlusIcon size={14} /> Templates <ChevronDownIcon size={14} /></summary>
+          <div>
+            <button type="button" onClick={addCommunityFiles}>GitHub community files</button>
+            {templateFiles.map(([path, content]) => (
+              <button type="button" key={path} onClick={() => addTemplate(path, content)}>{path}</button>
+            ))}
+          </div>
+        </details>
 
         <div className="tree" role="tree">
           {renderTree(tree)}
