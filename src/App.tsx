@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import JSZip from 'jszip'
 import {
   BellIcon,
   BookIcon,
@@ -7,6 +8,7 @@ import {
   ChevronRightIcon,
   CodeIcon,
   CopyIcon,
+  DownloadIcon,
   EyeIcon,
   FileCodeIcon,
   FileDirectoryIcon,
@@ -40,6 +42,7 @@ import {
   fileCount,
   fromBase64,
   guessMime,
+  isImage,
   isMarkdown,
   isProbablyText,
   joinPath,
@@ -50,7 +53,31 @@ import {
 } from './fsUtils'
 import { renderMarkdown } from './markdown'
 import { loadWorkspace, resetWorkspace, saveWorkspace } from './storage'
+import {
+  codeOfConductTemplate,
+  contributingTemplate,
+  issueTemplate,
+  mitLicense,
+  pullRequestTemplate,
+} from './templates'
 import type { TreeNode, Workspace, WorkspaceEntry } from './types'
+
+const templateFiles = [
+  ['LICENSE', mitLicense],
+  ['CONTRIBUTING.md', contributingTemplate],
+  ['CODE_OF_CONDUCT.md', codeOfConductTemplate],
+  ['.github/pull_request_template.md', pullRequestTemplate],
+  ['.github/ISSUE_TEMPLATE/bug_report.md', issueTemplate],
+] as const
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
 
 async function entryFromFile(file: File, forcedPath?: string): Promise<WorkspaceEntry> {
   const path = normalizePath(forcedPath || file.webkitRelativePath || file.name)
@@ -86,6 +113,7 @@ function App() {
   const [copied, setCopied] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
   const folderInput = useRef<HTMLInputElement>(null)
+  const zipInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     void loadWorkspace().then(setWorkspace)
@@ -165,6 +193,23 @@ function App() {
     mutate((draft) => deletePath(draft, path))
   }
 
+  function addTemplate(path: string, content: string) {
+    mutate((draft) => {
+      const finalPath = draft[path] ? uniquePath(draft, path) : path
+      createFile(draft, finalPath, content, guessMime(finalPath))
+      setSelectedPath(finalPath)
+      setMode('preview')
+    })
+  }
+
+  function addCommunityFiles() {
+    mutate((draft) => {
+      for (const [path, content] of templateFiles) {
+        if (!draft[path]) createFile(draft, path, content, guessMime(path))
+      }
+    })
+  }
+
   async function importFiles(files: FileList | null) {
     if (!files?.length || !workspace) return
     const entries = await Promise.all(Array.from(files).map((file) => entryFromFile(file)))
@@ -183,6 +228,51 @@ function App() {
       setSelectedPath(firstImported)
       setMode('preview')
     }
+  }
+
+  async function importZip(file: File | undefined) {
+    if (!file) return
+    const zip = await JSZip.loadAsync(file)
+    const entries: WorkspaceEntry[] = []
+    for (const [path, item] of Object.entries(zip.files)) {
+      const clean = normalizePath(path)
+      if (!clean || clean.includes('__MACOSX')) continue
+      if (item.dir) {
+        entries.push({ path: clean, type: 'dir', updatedAt: Date.now() })
+      } else if (isProbablyText(clean, guessMime(clean))) {
+        entries.push({ path: clean, type: 'file', content: await item.async('text'), mime: guessMime(clean), updatedAt: Date.now() })
+      } else {
+        entries.push({ path: clean, type: 'file', data: await item.async('base64'), mime: guessMime(clean), updatedAt: Date.now() })
+      }
+    }
+    const draft = { ...workspace }
+    for (const entry of entries) {
+      if (entry.type === 'dir') createDir(draft, entry.path)
+      else {
+        const parent = dirname(entry.path)
+        if (parent) createDir(draft, parent)
+        draft[entry.path] = entry
+      }
+    }
+    setWorkspace(draft)
+    saveWorkspace(draft)
+    const readme = entries.find((entry) => /(^|\/)readme\.md$/i.test(entry.path))
+    if (readme) {
+      setSelectedPath(readme.path)
+      setMode('preview')
+    }
+  }
+
+  async function exportZip() {
+    if (!workspace) return
+    const zip = new JSZip()
+    for (const entry of Object.values(workspace)) {
+      if (entry.type === 'dir') zip.folder(entry.path)
+      else if (entry.data) zip.file(entry.path, entry.data, { base64: true })
+      else zip.file(entry.path, entry.content ?? '')
+    }
+    const blob = await zip.generateAsync({ type: 'blob' })
+    downloadBlob(blob, 'howdoesitfeel-workspace.zip')
   }
 
   async function copyPath() {
@@ -256,8 +346,19 @@ function App() {
           <button type="button" onClick={promptNewFolder}><FileDirectoryIcon size={14} /> Pasta</button>
           <button type="button" onClick={() => fileInput.current?.click()}><UploadIcon size={14} /> Upload</button>
           <button type="button" onClick={() => folderInput.current?.click()}><UploadIcon size={14} /> Pasta</button>
+          <button type="button" onClick={() => zipInput.current?.click()}><BookIcon size={14} /> Importar ZIP</button>
+          <button type="button" className="primary" onClick={exportZip}><DownloadIcon size={14} /> Exportar ZIP</button>
         </div>
 
+        <details className="template-menu">
+          <summary><PlusIcon size={14} /> Templates <ChevronDownIcon size={14} /></summary>
+          <div>
+            <button type="button" onClick={addCommunityFiles}>GitHub community files</button>
+            {templateFiles.map(([path, content]) => (
+              <button type="button" key={path} onClick={() => addTemplate(path, content)}>{path}</button>
+            ))}
+          </div>
+        </details>
 
         <div className="tree" role="tree">
           {renderTree(tree)}
@@ -378,6 +479,10 @@ function App() {
                   onClick={handlePreviewClick}
                   dangerouslySetInnerHTML={{ __html: html }}
                 />
+              ) : isImage(selected.path) ? (
+                <div className="asset-preview">
+                  <img src={selected.data ? `data:${selected.mime};base64,${selected.data}` : `data:${selected.mime};charset=utf-8,${encodeURIComponent(selected.content ?? '')}`} alt={selected.path} />
+                </div>
               ) : (
                 <pre className="plain-file">{selected.content ?? 'Arquivo binário ou sem preview textual.'}</pre>
               )}
@@ -388,6 +493,7 @@ function App() {
 
       <input ref={fileInput} type="file" multiple hidden onChange={(event) => { void importFiles(event.target.files); event.currentTarget.value = '' }} />
       <input ref={folderInput} type="file" multiple hidden {...{ webkitdirectory: '' }} onChange={(event) => { void importFiles(event.target.files); event.currentTarget.value = '' }} />
+      <input ref={zipInput} type="file" accept=".zip" hidden onChange={(event) => { void importZip(event.target.files?.[0]); event.currentTarget.value = '' }} />
     </div>
   )
 }
