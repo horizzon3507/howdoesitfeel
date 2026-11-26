@@ -1197,3 +1197,197 @@
   cursor: not-allowed;
   opacity: .55;
 }
+
+/* Responsive repository layout */
+.repo-title-row,
+.repo-tabs,
+.repo-content {
+  width: min(1120px, 100%);
+}
+
+.repo-browser {
+  padding-inline: clamp(12px, 2.5vw, 28px);
+}
+
+.readme-tabs {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+@media (max-width: 1350px) {
+  .repo-content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .about-panel {
+    display: none;
+  }
+}
+
+@media (max-width: 1200px) {
+  .app-shell {
+    display: block;
+  }
+
+  .workspace-sidebar {
+    position: relative;
+    height: auto;
+    max-height: none;
+    padding: 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-default);
+  }
+
+  .brand-row {
+    margin-bottom: 10px;
+  }
+
+  .side-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .tree {
+    max-height: 240px;
+    min-height: 120px;
+  }
+
+  .stage {
+    min-width: 0;
+  }
+
+  .repo-title-row,
+  .repo-tabs,
+  .repo-content {
+    width: auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .browser-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .browser-actions {
+    flex-wrap: wrap;
+    margin-left: 0;
+  }
+
+  .file-row {
+    grid-template-columns: minmax(150px, 1fr) 70px;
+  }
+
+  .commit-message {
+    display: none;
+  }
+
+  .repo-actions,
+  .repo-title-row {
+    align-items: flex-start;
+  }
+
+  .repo-title-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .repo-actions {
+    flex-wrap: wrap;
+  }
+
+  .readme-header {
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+
+  .readme-meta {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 680px) {
+  .workspace-sidebar {
+    padding: 10px;
+  }
+
+  .side-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .repo-hero,
+  .repo-browser {
+    padding-inline: 10px;
+  }
+
+  .repo-title {
+    font-size: 16px;
+  }
+
+  .repo-tabs {
+    margin-inline: -10px;
+    padding-inline: 10px;
+  }
+
+  .browser-toolbar,
+  .browser-actions {
+    align-items: stretch;
+  }
+
+  .browser-actions,
+  .browser-actions button,
+  .go-file {
+    width: 100%;
+  }
+
+  .browser-actions button,
+  .go-file {
+    justify-content: center;
+  }
+
+  .file-table-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .file-row {
+    grid-template-columns: minmax(0, 1fr) 48px;
+    gap: 8px;
+    padding-inline: 8px;
+  }
+
+  .file-age {
+    font-size: 11px;
+  }
+
+  .readme-tabs {
+    width: 100%;
+    order: 2;
+  }
+
+  .readme-meta {
+    display: none;
+  }
+
+  .mode-switch {
+    margin-left: auto;
+  }
+
+  .markdown-body,
+  .markdown-editor,
+  .plain-file {
+    padding-inline: 14px;
+  }
+
+  .markdown-body {
+    font-size: 15px;
+  }
+}
+
+.workspace-sidebar.collapsed > :not(.brand-row) {
+  display: none;
+}
+
+.workspace-sidebar.collapsed {
+  height: auto;
+}
