@@ -42,6 +42,7 @@ import {
   fileCount,
   fromBase64,
   guessMime,
+  isImage,
   isMarkdown,
   isProbablyText,
   joinPath,
@@ -478,6 +479,10 @@ function App() {
                   onClick={handlePreviewClick}
                   dangerouslySetInnerHTML={{ __html: html }}
                 />
+              ) : isImage(selected.path) ? (
+                <div className="asset-preview">
+                  <img src={selected.data ? `data:${selected.mime};base64,${selected.data}` : `data:${selected.mime};charset=utf-8,${encodeURIComponent(selected.content ?? '')}`} alt={selected.path} />
+                </div>
               ) : (
                 <pre className="plain-file">{selected.content ?? 'Arquivo binário ou sem preview textual.'}</pre>
               )}
