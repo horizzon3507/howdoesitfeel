@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import JSZip from 'jszip'
 import {
-  BellIcon,
   BookIcon,
   CheckIcon,
   ChevronDownIcon,
@@ -15,17 +14,14 @@ import {
   FileIcon,
   GraphIcon,
   IssueOpenedIcon,
-  MarkGithubIcon,
   PencilIcon,
   PlayIcon,
   PlusIcon,
   ProjectIcon,
   RepoForkedIcon,
   RepoIcon,
-  SearchIcon,
   ShieldIcon,
   StarIcon,
-  ThreeBarsIcon,
   TrashIcon,
   UploadIcon,
   GitPullRequestIcon,
@@ -436,22 +432,6 @@ function App() {
 
       <main className="stage">
         <div className="github-frame">
-          <header className="github-topbar">
-            <button type="button" className="icon-button" aria-label="Menu"><ThreeBarsIcon size={16} /></button>
-            <MarkGithubIcon size={32} />
-            <span className="topbar-repo">horizzon3507 / renderme</span>
-            <label className="topbar-search">
-              <SearchIcon size={14} />
-              <input aria-label="Pesquisar" placeholder="Type / to search" readOnly />
-              <kbd>/</kbd>
-            </label>
-            <nav className="topbar-nav" aria-label="GitHub">
-              <span>Pull requests</span><span>Issues</span><span>Codespaces</span><span>Marketplace</span><span>Explore</span>
-            </nav>
-            <BellIcon size={16} />
-            <span className="avatar">H</span>
-          </header>
-
           <section className="repo-hero">
             <div className="repo-title-row">
               <div className="repo-title">

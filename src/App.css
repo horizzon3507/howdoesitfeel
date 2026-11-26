@@ -254,77 +254,13 @@
   box-shadow: 0 16px 48px rgba(1, 4, 9, 0.22);
 }
 
-.github-topbar {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-height: 62px;
-  padding: 0 18px;
-  color: #f0f6fc;
-  background: #0d1117;
-}
 
-.icon-button {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  place-items: center;
-  border: 1px solid #30363d;
-  border-radius: 6px;
-  color: inherit;
-  background: transparent;
-}
 
-.topbar-repo {
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-}
 
-.topbar-search {
-  display: flex;
-  align-items: center;
-  flex: 0 1 320px;
-  gap: 7px;
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid #30363d;
-  border-radius: 6px;
-  color: #7d8590;
-  background: rgba(1, 4, 9, 0.28);
-}
 
-.topbar-search input {
-  width: 100%;
-  min-width: 50px;
-  border: 0;
-  outline: 0;
-  color: #e6edf3;
-  background: transparent;
-  font-size: 13px;
-}
 
-.topbar-search input::placeholder {
-  color: #7d8590;
-}
 
-.topbar-search kbd {
-  padding: 1px 5px;
-  border: 1px solid #30363d;
-  border-radius: 4px;
-  font-family: inherit;
-  font-size: 11px;
-}
 
-.topbar-nav {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-left: auto;
-  font-size: 14px;
-  white-space: nowrap;
-}
 
 .avatar,
 .mini-avatar {
@@ -662,10 +598,7 @@
 
 @media (max-width: 1100px) {
   .topbar-nav,
-  .topbar-repo {
-    display: none;
-  }
-
+  
   .repo-title-row,
   .browser-toolbar {
     align-items: flex-start;
