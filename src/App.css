@@ -1248,8 +1248,9 @@
   }
 
   .tree {
+    flex: none;
     max-height: 240px;
-    min-height: 120px;
+    min-height: 0;
   }
 
   .stage {
@@ -1384,10 +1385,9 @@
   }
 }
 
-.workspace-sidebar.collapsed > :not(.brand-row) {
-  display: none;
-}
-
-.workspace-sidebar.collapsed {
-  height: auto;
+.markdown-body,
+.plain-file,
+.asset-preview {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 640px;
 }

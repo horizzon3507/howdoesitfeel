@@ -79,7 +79,8 @@ export async function loadWorkspace(): Promise<Workspace> {
 export function saveWorkspace(workspace: Workspace) {
   const diff = diffWorkspace(lastSaved, workspace)
   if (!diff.upserts.length && !diff.removals.length) return
-  lastSaved = cloneWorkspace(workspace)
+  for (const entry of diff.upserts) lastSaved[entry.path] = { ...entry }
+  for (const path of diff.removals) delete lastSaved[path]
   channel?.postMessage({ type: 'diff', diff } satisfies WorkspaceSyncMessage)
 
   writeChain = writeChain.then(async () => {

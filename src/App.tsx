@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import JSZip from 'jszip'
 import {
   BookIcon,
   ChevronDownIcon,
@@ -107,7 +106,11 @@ async function entryFromFile(file: File, forcedPath?: string): Promise<Workspace
   }
 }
 
-async function entryFromZipItem(path: string, item: JSZip.JSZipObject): Promise<WorkspaceEntry> {
+type ZipItem = {
+  async(type: 'uint8array'): Promise<Uint8Array>
+}
+
+async function entryFromZipItem(path: string, item: ZipItem): Promise<WorkspaceEntry> {
   const mime = guessMime(path)
   const bytes = await item.async('uint8array')
   const content = isProbablyText(path, mime) ? decodeTextBytes(bytes) : null
@@ -191,7 +194,6 @@ function App() {
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [repoUrl, setRepoUrl] = useState('')
   const [repoBusy, setRepoBusy] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(() => !window.matchMedia('(max-width: 1200px)').matches)
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [selectedPath, setSelectedPath] = useState('README.md')
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['.github', '.github/assets', '.github/ISSUE_TEMPLATE', 'docs']))
@@ -384,6 +386,7 @@ function App() {
 
   async function importZip(file: File | undefined) {
     if (!file) return
+    const { default: JSZip } = await import('jszip')
     const zip = await JSZip.loadAsync(file)
     const entries: WorkspaceEntry[] = []
     for (const [path, item] of Object.entries(zip.files)) {
@@ -514,6 +517,7 @@ function App() {
 
   async function exportZip() {
     if (!workspace) return
+    const { default: JSZip } = await import('jszip')
     const zip = new JSZip()
     for (const entry of Object.values(workspace)) {
       if (entry.type === 'dir') zip.folder(entry.path)
@@ -589,21 +593,12 @@ function App() {
 
   return (
     <div className="app-shell">
-      <aside className={`workspace-sidebar ${sidebarOpen ? '' : 'collapsed'}`} aria-label="Explorador de arquivos local">
+      <aside className="workspace-sidebar" aria-label="Explorador de arquivos local">
         <div className="brand-row">
           <div>
             <strong>renderme</strong>
           </div>
           <div className="brand-actions">
-            <button
-              type="button"
-              className="theme-toggle"
-              aria-label={sidebarOpen ? 'Recolher explorador' : 'Expandir explorador'}
-              aria-expanded={sidebarOpen}
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-            >
-              {sidebarOpen ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
-            </button>
             <button
               type="button"
               className="theme-toggle"
