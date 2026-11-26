@@ -1,12 +1,15 @@
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
+import type { Workspace } from './types'
 
 marked.use({
   gfm: true,
   breaks: false,
 })
 
-export function renderMarkdown(markdown: string) {
+export function renderMarkdown(markdown: string, currentPath?: string, workspace?: Workspace) {
+  void currentPath
+  void workspace
   const raw = marked.parse(markdown, { async: false }) as string
   const doc = new DOMParser().parseFromString(raw, 'text/html')
 

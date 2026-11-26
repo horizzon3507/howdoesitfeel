@@ -1,14 +1,22 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   BellIcon,
   BookIcon,
+  CheckIcon,
   ChevronDownIcon,
+  ChevronRightIcon,
   CodeIcon,
+  CopyIcon,
   EyeIcon,
+  FileCodeIcon,
+  FileDirectoryIcon,
+  FileIcon,
   GraphIcon,
   IssueOpenedIcon,
   MarkGithubIcon,
+  PencilIcon,
   PlayIcon,
+  PlusIcon,
   ProjectIcon,
   RepoForkedIcon,
   RepoIcon,
@@ -16,109 +24,372 @@ import {
   ShieldIcon,
   StarIcon,
   ThreeBarsIcon,
+  TrashIcon,
+  UploadIcon,
   GitPullRequestIcon,
 } from '@primer/octicons-react'
 import 'github-markdown-css/github-markdown-light.css'
 import './App.css'
+import {
+  basename,
+  buildTree,
+  createDir,
+  createFile,
+  deletePath,
+  dirname,
+  fileCount,
+  fromBase64,
+  guessMime,
+  isMarkdown,
+  isProbablyText,
+  joinPath,
+  normalizePath,
+  renamePath,
+  toBase64,
+  uniquePath,
+} from './fsUtils'
 import { renderMarkdown } from './markdown'
+import { loadWorkspace, resetWorkspace, saveWorkspace } from './storage'
+import type { TreeNode, Workspace, WorkspaceEntry } from './types'
 
-const sampleMarkdown = `# howdoesitfeel
+async function entryFromFile(file: File, forcedPath?: string): Promise<WorkspaceEntry> {
+  const path = normalizePath(forcedPath || file.webkitRelativePath || file.name)
+  const mime = file.type || guessMime(path)
+  if (isProbablyText(path, mime)) {
+    return {
+      path,
+      type: 'file',
+      content: await file.text(),
+      mime,
+      updatedAt: Date.now(),
+    }
+  }
+  return {
+    path,
+    type: 'file',
+    data: toBase64(new Uint8Array(await file.arrayBuffer())),
+    mime,
+    updatedAt: Date.now(),
+  }
+}
 
-A local-first README studio that recreates the GitHub repository preview before you push.
-
-## Features
-
-- GitHub-like repository chrome and markdown rendering
-- Raw markdown editing beside an accurate preview
-- Local-first workflow with no backend
-
-> [!TIP]
-> The final app resolves local assets, workspace files and ZIP exports.
-`
+function entryBytes(entry: WorkspaceEntry) {
+  if (entry.data) return fromBase64(entry.data)
+  return new TextEncoder().encode(entry.content ?? '')
+}
 
 function App() {
+  const [workspace, setWorkspace] = useState<Workspace | null>(null)
+  const [selectedPath, setSelectedPath] = useState('README.md')
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(['.github', '.github/assets', '.github/ISSUE_TEMPLATE', 'docs']))
   const [mode, setMode] = useState<'preview' | 'edit'>('preview')
-  const [markdown, setMarkdown] = useState(sampleMarkdown)
-  const html = useMemo(() => renderMarkdown(markdown), [markdown])
+  const [copied, setCopied] = useState(false)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const folderInput = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    void loadWorkspace().then(setWorkspace)
+  }, [])
+
+  const fallbackPath = workspace?.['README.md']?.type === 'file'
+    ? 'README.md'
+    : Object.values(workspace ?? {}).find((entry) => entry.type === 'file')?.path ?? 'README.md'
+  const activePath = workspace?.[selectedPath]?.type === 'file' ? selectedPath : fallbackPath
+  const selected = workspace?.[activePath]
+  const tree = useMemo(() => buildTree(workspace ?? {}), [workspace])
+  const count = useMemo(() => fileCount(workspace ?? {}), [workspace])
+
+  const html = useMemo(() => {
+    if (!workspace || !selected || selected.type !== 'file' || !isMarkdown(selected.path)) return ''
+    return renderMarkdown(selected.content ?? '', selected.path, workspace)
+  }, [workspace, selected])
+
+  function mutate(mutator: (draft: Workspace) => void) {
+    setWorkspace((current) => {
+      if (!current) return current
+      const draft = { ...current }
+      mutator(draft)
+      saveWorkspace(draft)
+      return draft
+    })
+  }
+
+  function selectEntry(path: string) {
+    setSelectedPath(path)
+    setMode('preview')
+  }
+
+  function toggleDir(path: string) {
+    setExpanded((current) => {
+      const next = new Set(current)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }
+
+  function promptNewFile() {
+    const suggested = selected?.type === 'dir' ? joinPath(selected.path, 'untitled.md') : joinPath(dirname(selectedPath), 'untitled.md')
+    const input = window.prompt('Caminho do novo arquivo', suggested)
+    if (!input) return
+    mutate((draft) => {
+      const path = uniquePath(draft, input)
+      createFile(draft, path, isMarkdown(path) ? '# Novo arquivo\n' : '', guessMime(path))
+      setSelectedPath(path)
+      setMode('edit')
+    })
+  }
+
+  function promptNewFolder() {
+    const input = window.prompt('Caminho da nova pasta', '.github/assets')
+    if (!input) return
+    mutate((draft) => createDir(draft, input))
+    const clean = normalizePath(input)
+    setExpanded((current) => new Set(current).add(clean))
+  }
+
+  function promptRename(path: string) {
+    const input = window.prompt('Novo caminho', path)
+    if (!input || input === path) return
+    mutate((draft) => {
+      if (renamePath(draft, path, input)) {
+        if (selectedPath === path || selectedPath.startsWith(`${path}/`)) {
+          setSelectedPath(normalizePath(input) + selectedPath.slice(path.length))
+        }
+      }
+    })
+  }
+
+  function removePath(path: string) {
+    if (!window.confirm(`Excluir ${path}?`)) return
+    mutate((draft) => deletePath(draft, path))
+  }
+
+  async function importFiles(files: FileList | null) {
+    if (!files?.length || !workspace) return
+    const entries = await Promise.all(Array.from(files).map((file) => entryFromFile(file)))
+    const draft = { ...workspace }
+    let firstImported = ''
+    for (const entry of entries) {
+      const finalPath = uniquePath(draft, entry.path)
+      const parent = dirname(finalPath)
+      if (parent) createDir(draft, parent)
+      draft[finalPath] = { ...entry, path: finalPath }
+      if (!firstImported) firstImported = finalPath
+    }
+    setWorkspace(draft)
+    saveWorkspace(draft)
+    if (firstImported) {
+      setSelectedPath(firstImported)
+      setMode('preview')
+    }
+  }
+
+  async function copyPath() {
+    await navigator.clipboard.writeText(activePath)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1200)
+  }
+
+  function handlePreviewClick(event: React.MouseEvent<HTMLElement>) {
+    const anchor = (event.target as HTMLElement).closest('a[data-local-path]')
+    if (!anchor) return
+    event.preventDefault()
+    const path = anchor.getAttribute('data-local-path')
+    if (path) selectEntry(path)
+  }
+
+  function renderTree(nodes: TreeNode[], depth = 0) {
+    return nodes.map((node) => {
+      const open = expanded.has(node.path)
+      const active = activePath === node.path
+      return (
+        <div key={node.path}>
+          <div
+            className={`tree-row ${active ? 'active' : ''}`}
+            style={{ paddingInlineStart: 8 + depth * 14 }}
+          >
+            <button
+              type="button"
+              className="tree-main"
+              onClick={() => node.type === 'dir' ? toggleDir(node.path) : selectEntry(node.path)}
+              aria-expanded={node.type === 'dir' ? open : undefined}
+            >
+              {node.type === 'dir' ? (
+                open ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />
+              ) : <span className="tree-spacer" />}
+              {node.type === 'dir' ? <FileDirectoryIcon size={16} /> : isMarkdown(node.path) ? <FileCodeIcon size={16} /> : <FileIcon size={16} />}
+              <span className="tree-name">{node.name}</span>
+            </button>
+            <span className="tree-actions">
+              <button type="button" aria-label={`Renomear ${node.path}`} onClick={() => promptRename(node.path)}><PencilIcon size={13} /></button>
+              <button type="button" aria-label={`Excluir ${node.path}`} onClick={() => removePath(node.path)}><TrashIcon size={13} /></button>
+            </span>
+          </div>
+          {node.type === 'dir' && open ? renderTree(node.children, depth + 1) : null}
+        </div>
+      )
+    })
+  }
+
+  if (!workspace) {
+    return <div className="loading">Carregando workspace local…</div>
+  }
+
+  const readmeName = basename(selectedPath)
+  const lineCount = selected?.content?.split('\n').length ?? 0
+  const bytes = selected?.type === 'file' ? entryBytes(selected).length : 0
 
   return (
-    <main className="stage">
-      <div className="github-frame">
-        <header className="github-topbar">
-          <button type="button" className="icon-button" aria-label="Menu"><ThreeBarsIcon size={16} /></button>
-          <MarkGithubIcon size={32} />
-          <span className="topbar-repo">horizzon3507 / howdoesitfeel</span>
-          <label className="topbar-search">
-            <SearchIcon size={14} />
-            <input aria-label="Pesquisar" placeholder="Type / to search" readOnly />
-            <kbd>/</kbd>
-          </label>
-          <nav className="topbar-nav" aria-label="GitHub">
-            <span>Pull requests</span><span>Issues</span><span>Codespaces</span><span>Marketplace</span><span>Explore</span>
-          </nav>
-          <BellIcon size={16} />
-          <span className="avatar">H</span>
-        </header>
-
-        <section className="repo-hero">
-          <div className="repo-title-row">
-            <div className="repo-title">
-              <RepoIcon size={16} />
-              <a href="#owner">horizzon3507</a>
-              <span>/</span>
-              <a href="#repo" className="repo-name">howdoesitfeel</a>
-              <span className="visibility">Public</span>
-            </div>
-            <div className="repo-actions">
-              <button type="button"><EyeIcon size={16} /> Watch <strong>8</strong></button>
-              <button type="button"><RepoForkedIcon size={16} /> Fork <strong>12</strong></button>
-              <button type="button"><StarIcon size={16} /> Star <strong>128</strong></button>
-            </div>
+    <div className="app-shell">
+      <aside className="workspace-sidebar" aria-label="Explorador de arquivos local">
+        <div className="brand-row">
+          <div>
+            <strong>howdoesitfeel</strong>
+            <span>workspace local</span>
           </div>
-          <nav className="repo-tabs" aria-label="Repository">
-            <span className="active"><CodeIcon size={16} /> Code</span>
-            <span><IssueOpenedIcon size={16} /> Issues <em>3</em></span>
-            <span><GitPullRequestIcon size={16} /> Pull requests <em>1</em></span>
-            <span><PlayIcon size={16} /> Actions</span>
-            <span><ProjectIcon size={16} /> Projects</span>
-            <span><BookIcon size={16} /> Wiki</span>
-            <span><ShieldIcon size={16} /> Security</span>
-            <span><GraphIcon size={16} /> Insights</span>
-          </nav>
-        </section>
+          <span className="local-pill"><CheckIcon size={12} /> local</span>
+        </div>
 
-        <section className="repo-browser">
-          <div className="browser-toolbar">
-            <button type="button" className="branch-button"><CodeIcon size={14} /> main <ChevronDownIcon size={14} /></button>
-            <span className="file-count"><strong>1</strong> file</span>
-            <div className="browser-actions">
-              <button type="button" className="green">Add file <ChevronDownIcon size={14} /></button>
-              <button type="button" className="green strong"><CodeIcon size={14} /> Code <ChevronDownIcon size={14} /></button>
-            </div>
-          </div>
+        <div className="side-actions">
+          <button type="button" onClick={promptNewFile}><PlusIcon size={14} /> Arquivo</button>
+          <button type="button" onClick={promptNewFolder}><FileDirectoryIcon size={14} /> Pasta</button>
+          <button type="button" onClick={() => fileInput.current?.click()}><UploadIcon size={14} /> Upload</button>
+          <button type="button" onClick={() => folderInput.current?.click()}><UploadIcon size={14} /> Pasta</button>
+        </div>
 
-          <article className="readme-card">
-            <header className="readme-header">
-              <span className="readme-title"><BookIcon size={16} /> README.md</span>
-              <div className="mode-switch" role="tablist" aria-label="Modo do markdown">
-                <button type="button" className={mode === 'preview' ? 'active' : ''} onClick={() => setMode('preview')}>Preview</button>
-                <button type="button" className={mode === 'edit' ? 'active' : ''} onClick={() => setMode('edit')}>Edit</button>
+
+        <div className="tree" role="tree">
+          {renderTree(tree)}
+        </div>
+
+        <button
+          type="button"
+          className="reset-button"
+          onClick={() => {
+            if (window.confirm('Restaurar o exemplo e apagar o workspace atual?')) {
+              void resetWorkspace().then((sample) => {
+                setWorkspace(sample)
+                setSelectedPath('README.md')
+                setMode('preview')
+              })
+            }
+          }}
+        >
+          Restaurar exemplo
+        </button>
+      </aside>
+
+      <main className="stage">
+        <div className="github-frame">
+          <header className="github-topbar">
+            <button type="button" className="icon-button" aria-label="Menu"><ThreeBarsIcon size={16} /></button>
+            <MarkGithubIcon size={32} />
+            <span className="topbar-repo">horizzon3507 / howdoesitfeel</span>
+            <label className="topbar-search">
+              <SearchIcon size={14} />
+              <input aria-label="Pesquisar" placeholder="Type / to search" readOnly />
+              <kbd>/</kbd>
+            </label>
+            <nav className="topbar-nav" aria-label="GitHub">
+              <span>Pull requests</span><span>Issues</span><span>Codespaces</span><span>Marketplace</span><span>Explore</span>
+            </nav>
+            <BellIcon size={16} />
+            <span className="avatar">H</span>
+          </header>
+
+          <section className="repo-hero">
+            <div className="repo-title-row">
+              <div className="repo-title">
+                <RepoIcon size={16} />
+                <a href="#owner">horizzon3507</a>
+                <span>/</span>
+                <a href="#repo" className="repo-name">howdoesitfeel</a>
+                <span className="visibility">Public</span>
               </div>
-            </header>
-            {mode === 'edit' ? (
-              <textarea
-                className="markdown-editor"
-                value={markdown}
-                spellCheck={false}
-                onChange={(event) => setMarkdown(event.target.value)}
-              />
-            ) : (
-              <div className="markdown-body" dangerouslySetInnerHTML={{ __html: html }} />
-            )}
-          </article>
-        </section>
-      </div>
-    </main>
+              <div className="repo-actions">
+                <button type="button"><EyeIcon size={16} /> Watch <strong>8</strong></button>
+                <button type="button"><RepoForkedIcon size={16} /> Fork <strong>12</strong></button>
+                <button type="button"><StarIcon size={16} /> Star <strong>128</strong></button>
+              </div>
+            </div>
+            <nav className="repo-tabs" aria-label="Repository">
+              <span className="active"><CodeIcon size={16} /> Code</span>
+              <span><IssueOpenedIcon size={16} /> Issues <em>3</em></span>
+              <span><GitPullRequestIcon size={16} /> Pull requests <em>1</em></span>
+              <span><PlayIcon size={16} /> Actions</span>
+              <span><ProjectIcon size={16} /> Projects</span>
+              <span><BookIcon size={16} /> Wiki</span>
+              <span><ShieldIcon size={16} /> Security</span>
+              <span><GraphIcon size={16} /> Insights</span>
+            </nav>
+          </section>
+
+          <section className="repo-browser">
+            <div className="browser-toolbar">
+              <button type="button" className="branch-button"><CodeIcon size={14} /> main <ChevronDownIcon size={14} /></button>
+              <span className="file-count"><strong>{count}</strong> files</span>
+              <div className="browser-actions">
+                <button type="button" onClick={copyPath}>{copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />} {copied ? 'Copied' : 'Copy path'}</button>
+                <button type="button" className="green">Add file <ChevronDownIcon size={14} /></button>
+                <button type="button" className="green strong"><CodeIcon size={14} /> Code <ChevronDownIcon size={14} /></button>
+              </div>
+            </div>
+
+            <div className="file-panel">
+              <div className="file-panel-header">
+                <div className="committer"><span className="mini-avatar">H</span><strong>horizzon3507</strong><span>local preview</span></div>
+                <span>now</span>
+              </div>
+              <div className="path-row">
+                <span className="path-label">{activePath}</span>
+                <span>{lineCount} lines · {bytes} bytes</span>
+              </div>
+            </div>
+
+            <article className="readme-card">
+              <header className="readme-header">
+                <span className="readme-title"><BookIcon size={16} /> {readmeName}</span>
+                {selected?.type === 'file' && isMarkdown(selected.path) ? (
+                  <div className="mode-switch" role="tablist" aria-label="Modo do markdown">
+                    <button type="button" className={mode === 'preview' ? 'active' : ''} onClick={() => setMode('preview')}>Preview</button>
+                    <button type="button" className={mode === 'edit' ? 'active' : ''} onClick={() => setMode('edit')}>Edit</button>
+                  </div>
+                ) : null}
+              </header>
+
+              {selected?.type !== 'file' ? (
+                <div className="empty-state">Selecione um arquivo no explorador.</div>
+              ) : isMarkdown(selected.path) && mode === 'edit' ? (
+                <textarea
+                  className="markdown-editor"
+                  value={selected.content ?? ''}
+                  spellCheck={false}
+                  readOnly
+                  onChange={(event) => {
+                    const value = event.target.value
+                    mutate((draft) => {
+                      if (draft[selected.path]) draft[selected.path] = { ...draft[selected.path], content: value, updatedAt: Date.now() }
+                    })
+                  }}
+                />
+              ) : isMarkdown(selected.path) ? (
+                <div
+                  className="markdown-body"
+                  onClick={handlePreviewClick}
+                  dangerouslySetInnerHTML={{ __html: html }}
+                />
+              ) : (
+                <pre className="plain-file">{selected.content ?? 'Arquivo binário ou sem preview textual.'}</pre>
+              )}
+            </article>
+          </section>
+        </div>
+      </main>
+
+      <input ref={fileInput} type="file" multiple hidden onChange={(event) => { void importFiles(event.target.files); event.currentTarget.value = '' }} />
+      <input ref={folderInput} type="file" multiple hidden {...{ webkitdirectory: '' }} onChange={(event) => { void importFiles(event.target.files); event.currentTarget.value = '' }} />
+    </div>
   )
 }
 
