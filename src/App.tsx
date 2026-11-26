@@ -25,8 +25,11 @@ import {
   TrashIcon,
   UploadIcon,
   GitPullRequestIcon,
+  MoonIcon,
+  SunIcon,
 } from '@primer/octicons-react'
-import 'github-markdown-css/github-markdown-light.css'
+import markdownDarkUrl from 'github-markdown-css/github-markdown-dark.css?url'
+import markdownLightUrl from 'github-markdown-css/github-markdown-light.css?url'
 import './App.css'
 import {
   basename,
@@ -123,7 +126,16 @@ function entryBytes(entry: WorkspaceEntry) {
   return new TextEncoder().encode(entry.content ?? '')
 }
 
+type ThemeName = 'light' | 'dark'
+
+function initialTheme(): ThemeName {
+  const stored = window.localStorage.getItem('renderme-theme')
+  if (stored === 'light' || stored === 'dark') return stored
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
 function App() {
+  const [theme, setTheme] = useState<ThemeName>(initialTheme)
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [selectedPath, setSelectedPath] = useState('README.md')
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['.github', '.github/assets', '.github/ISSUE_TEMPLATE', 'docs']))
@@ -133,6 +145,21 @@ function App() {
   const folderInput = useRef<HTMLInputElement>(null)
   const zipInput = useRef<HTMLInputElement>(null)
   const workspaceRef = useRef<Workspace | null>(null)
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    document.documentElement.style.colorScheme = theme
+    window.localStorage.setItem('renderme-theme', theme)
+
+    let link = document.getElementById('renderme-markdown-theme') as HTMLLinkElement | null
+    if (!link) {
+      link = document.createElement('link')
+      link.id = 'renderme-markdown-theme'
+      link.rel = 'stylesheet'
+      document.head.append(link)
+    }
+    link.href = theme === 'dark' ? markdownDarkUrl : markdownLightUrl
+  }, [theme])
 
   useEffect(() => {
     void loadWorkspace().then((loaded) => {
@@ -386,7 +413,17 @@ function App() {
             <strong>renderme</strong>
             <span>workspace local</span>
           </div>
-          <span className="local-pill"><CheckIcon size={12} /> local</span>
+          <div className="brand-actions">
+            <button
+              type="button"
+              className="theme-toggle"
+              aria-label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            >
+              {theme === 'dark' ? <SunIcon size={14} /> : <MoonIcon size={14} />}
+            </button>
+            <span className="local-pill"><CheckIcon size={12} /> local</span>
+          </div>
         </div>
 
         <div className="side-actions">
