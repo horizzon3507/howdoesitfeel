@@ -4,7 +4,7 @@ import { sampleWorkspaceFiles } from './templates'
 import type { Workspace } from './types'
 
 const store = localforage.createInstance({
-  name: 'howdoesitfeel',
+  name: 'renderme',
   storeName: 'workspace',
 })
 

@@ -272,7 +272,7 @@ function App() {
       else zip.file(entry.path, entry.content ?? '')
     }
     const blob = await zip.generateAsync({ type: 'blob' })
-    downloadBlob(blob, 'howdoesitfeel-workspace.zip')
+    downloadBlob(blob, 'renderme-workspace.zip')
   }
 
   async function copyPath() {
@@ -335,7 +335,7 @@ function App() {
       <aside className="workspace-sidebar" aria-label="Explorador de arquivos local">
         <div className="brand-row">
           <div>
-            <strong>howdoesitfeel</strong>
+            <strong>renderme</strong>
             <span>workspace local</span>
           </div>
           <span className="local-pill"><CheckIcon size={12} /> local</span>
@@ -386,7 +386,7 @@ function App() {
           <header className="github-topbar">
             <button type="button" className="icon-button" aria-label="Menu"><ThreeBarsIcon size={16} /></button>
             <MarkGithubIcon size={32} />
-            <span className="topbar-repo">horizzon3507 / howdoesitfeel</span>
+            <span className="topbar-repo">horizzon3507 / renderme</span>
             <label className="topbar-search">
               <SearchIcon size={14} />
               <input aria-label="Pesquisar" placeholder="Type / to search" readOnly />
@@ -405,7 +405,7 @@ function App() {
                 <RepoIcon size={16} />
                 <a href="#owner">horizzon3507</a>
                 <span>/</span>
-                <a href="#repo" className="repo-name">howdoesitfeel</a>
+                <a href="#repo" className="repo-name">renderme</a>
                 <span className="visibility">Public</span>
               </div>
               <div className="repo-actions">
