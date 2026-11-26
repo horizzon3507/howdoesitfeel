@@ -39,6 +39,14 @@ function addHeadingIds(doc: Document) {
   })
 }
 
+const alertIcons: Record<string, string> = {
+  note: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="8" cy="4.8" r="1" fill="currentColor"/></svg>',
+  tip: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 9.8 6 14.5 8 9.8 10 8 14.5 6.2 10 1.5 8 6.2 6Z" fill="currentColor"/></svg>',
+  important: '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="11.5" r="1" fill="currentColor"/></svg>',
+  warning: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 15 14H1Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="8" cy="12" r=".9" fill="currentColor"/></svg>',
+  caution: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 15 14H1Z" fill="currentColor"/><path d="M8 6v4" stroke="var(--bgColor-default,#0d1117)" stroke-width="1.7" stroke-linecap="round"/><circle cx="8" cy="12" r=".9" fill="var(--bgColor-default,#0d1117)"/></svg>',
+}
+
 function renderAlerts(doc: Document) {
   doc.querySelectorAll('blockquote').forEach((blockquote) => {
     const first = blockquote.querySelector('p')
@@ -50,7 +58,7 @@ function renderAlerts(doc: Document) {
     blockquote.classList.add('markdown-alert', `markdown-alert-${type}`)
     const title = doc.createElement('div')
     title.className = 'markdown-alert-title'
-    title.textContent = type[0].toUpperCase() + type.slice(1)
+    title.innerHTML = `${alertIcons[type] ?? alertIcons.note}<span>${type[0].toUpperCase() + type.slice(1)}</span>`
     blockquote.prepend(title)
   })
 }
@@ -84,6 +92,7 @@ export function renderMarkdown(markdown: string, currentPath: string, workspace:
 
   return DOMPurify.sanitize(doc.body.innerHTML, {
     USE_PROFILES: { html: true },
-    ADD_ATTR: ['target', 'data-local-path'],
+    ADD_TAGS: ['svg', 'circle', 'path', 'rect'],
+    ADD_ATTR: ['target', 'data-local-path', 'viewBox', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'cx', 'cy', 'r', 'd', 'x', 'y', 'width', 'height', 'rx', 'aria-hidden'],
   })
 }
