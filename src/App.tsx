@@ -57,13 +57,13 @@ import {
   codeOfConductTemplate,
   contributingTemplate,
   issueTemplate,
-  mitLicense,
+  apacheLicense,
   pullRequestTemplate,
 } from './templates'
 import type { TreeNode, Workspace, WorkspaceEntry } from './types'
 
 const templateFiles = [
-  ['LICENSE', mitLicense],
+  ['LICENSE', apacheLicense],
   ['CONTRIBUTING.md', contributingTemplate],
   ['CODE_OF_CONDUCT.md', codeOfConductTemplate],
   ['.github/pull_request_template.md', pullRequestTemplate],
@@ -403,7 +403,7 @@ function App() {
       <aside className="workspace-sidebar" aria-label="Explorador de arquivos local">
         <div className="brand-row">
           <div>
-            <strong>renderme</strong>
+            <strong><img className="brand-logo" src={theme === 'dark' ? '/logo-dark.svg' : '/logo.svg'} alt="" /> renderme</strong>
             <span>workspace local</span>
           </div>
           <div className="brand-actions">
@@ -419,10 +419,10 @@ function App() {
         </div>
 
         <div className="side-actions">
-          <button type="button" onClick={promptNewFile}><PlusIcon size={14} /> Arquivo</button>
-          <button type="button" onClick={promptNewFolder}><FileDirectoryIcon size={14} /> Pasta</button>
-          <button type="button" onClick={() => fileInput.current?.click()}><UploadIcon size={14} /> Upload</button>
-          <button type="button" onClick={() => folderInput.current?.click()}><UploadIcon size={14} /> Pasta</button>
+          <button type="button" onClick={promptNewFile}><PlusIcon size={14} /> Novo arquivo</button>
+          <button type="button" onClick={promptNewFolder}><FileDirectoryIcon size={14} /> Nova pasta</button>
+          <button type="button" onClick={() => fileInput.current?.click()}><UploadIcon size={14} /> Upload arquivo</button>
+          <button type="button" onClick={() => folderInput.current?.click()}><UploadIcon size={14} /> Upload pasta</button>
           <button type="button" onClick={() => zipInput.current?.click()}><BookIcon size={14} /> Importar ZIP</button>
           <button type="button" className="primary" onClick={exportZip}><DownloadIcon size={14} /> Exportar ZIP</button>
         </div>
@@ -529,7 +529,7 @@ function App() {
                       {[
                         ['README.md', 'README'],
                         ['CONTRIBUTING.md', 'Contributing'],
-                        ['LICENSE', 'MIT license'],
+                        ['LICENSE', 'Apache-2.0 license'],
                         ['SECURITY.md', 'Security'],
                       ].filter(([path]) => workspace?.[path]).map(([path, label]) => (
                         <button type="button" className={activePath === path ? 'active' : ''} key={path} onClick={() => selectEntry(path)}>
@@ -582,7 +582,7 @@ function App() {
                 <div className="topic-row"><span>readme</span><span>markdown</span><span>github-preview</span></div>
                 <div className="about-links">
                   <span><BookIcon size={14} /> Readme</span>
-                  <span><ShieldIcon size={14} /> MIT license</span>
+                  <span><ShieldIcon size={14} /> Apache-2.0 license</span>
                   <span><GraphIcon size={14} /> Activity</span>
                   <span><StarIcon size={14} /> 128 stars</span>
                   <span><EyeIcon size={14} /> 8 watching</span>
