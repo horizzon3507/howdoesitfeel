@@ -1391,3 +1391,246 @@
   content-visibility: auto;
   contain-intrinsic-size: auto 640px;
 }
+
+/* GitHub-first layout: workspace operations live inside repository chrome */
+.app-shell {
+  display: block;
+}
+
+.repo-hero {
+  padding: 16px 0 0;
+}
+
+.repo-title-row,
+.repo-tabs,
+.repo-content {
+  width: min(1280px, calc(100% - 32px));
+  max-width: 1280px;
+  margin-inline: auto;
+}
+
+.repo-browser {
+  max-width: none;
+  padding: 24px 0 48px;
+}
+
+.repo-content {
+  grid-template-columns: minmax(0, 1fr) 296px;
+  gap: 32px;
+}
+
+.browser-toolbar {
+  min-height: 32px;
+}
+
+.browser-menu {
+  right: 0;
+  left: auto;
+  width: 220px;
+  padding: 4px 0;
+}
+
+.browser-menu button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 12px;
+  color: var(--fg-default);
+  font-size: 13px;
+  text-align: left;
+}
+
+.code-menu {
+  width: 304px;
+  max-height: min(520px, calc(100vh - 120px));
+  overflow-y: auto;
+}
+
+.menu-section {
+  padding: 8px 12px 4px;
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.menu-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  padding: 4px 12px 8px;
+}
+
+.menu-input-row input {
+  min-width: 0;
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  color: var(--fg-default);
+  background: var(--bg-inset);
+  font-size: 12px;
+}
+
+.menu-input-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--control-bg);
+  font-size: 12px;
+}
+
+.browser-menu .danger {
+  color: #d1242f;
+}
+
+.file-row {
+  position: relative;
+  grid-template-columns: minmax(170px, .9fr) minmax(0, 1.8fr) 72px 48px;
+  padding-right: 6px;
+}
+
+.file-spacer {
+  width: 14px;
+  flex: 0 0 auto;
+}
+
+.file-actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 2px;
+  opacity: 0;
+}
+
+.file-row:hover .file-actions,
+.file-row:focus-within .file-actions {
+  opacity: 1;
+}
+
+.file-actions button {
+  display: inline-grid;
+  width: 21px;
+  height: 21px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  color: var(--fg-muted);
+  background: transparent;
+}
+
+.file-actions button:hover {
+  color: var(--fg-default);
+  background: var(--control-hover);
+}
+
+@media (max-width: 1012px) {
+  .repo-content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .about-panel {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .file-row {
+    grid-template-columns: minmax(140px, 1fr) 62px 48px;
+  }
+}
+
+@media (max-width: 680px) {
+  .repo-title-row,
+  .repo-tabs,
+  .repo-content {
+    width: calc(100% - 20px);
+  }
+
+  .repo-browser {
+    padding-top: 16px;
+  }
+
+  .file-row {
+    grid-template-columns: minmax(0, 1fr) 44px 48px;
+  }
+
+  .browser-menu {
+    position: fixed;
+    right: 10px;
+    left: 10px;
+    width: auto;
+  }
+}
+
+.about-panel {
+  display: block;
+}
+
+@media (max-width: 1012px) {
+  .about-panel {
+    display: none;
+  }
+}
+
+.repo-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: min(1280px, calc(100% - 32px));
+  margin: 0 auto 8px;
+  color: var(--fg-muted);
+  font-size: 14px;
+}
+
+.repo-breadcrumb .identity-link {
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.repo-tabs {
+  border-bottom: 1px solid var(--border-default);
+}
+
+.repo-hero .repo-title-row {
+  padding-top: 15px;
+  padding-bottom: 15px;
+  margin-bottom: 0;
+}
+
+.repo-hero .repo-title {
+  color: var(--fg-default);
+  font-size: 20px;
+  font-weight: 400;
+}
+
+.repo-hero .repo-title svg {
+  color: var(--fg-muted);
+}
+
+.repo-hero .repo-title .repo-name {
+  color: var(--fg-default);
+  font-weight: 600;
+}
+
+[data-theme='dark'] .repo-hero .repo-title .repo-name {
+  color: var(--fg-default);
+}
+
+.file-link {
+  color: #4493f8;
+}
+
+[data-theme='light'] .file-link {
+  color: #0969da;
+}
+
+.file-link:hover span:last-child {
+  text-decoration: underline;
+}
