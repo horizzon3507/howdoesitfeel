@@ -140,6 +140,8 @@ function App() {
   const [projectName, setProjectName] = useState(() => window.localStorage.getItem('renderme-project') || 'project')
   const [chooser, setChooser] = useState<'new' | 'upload' | null>(null)
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
+  const [repoUrl, setRepoUrl] = useState('')
+  const [repoBusy, setRepoBusy] = useState(false)
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [selectedPath, setSelectedPath] = useState('README.md')
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['.github', '.github/assets', '.github/ISSUE_TEMPLATE', 'docs']))
@@ -370,6 +372,63 @@ function App() {
     }
   }
 
+
+  async function importRepository() {
+    const input = repoUrl.trim()
+    const match = input.match(/(?:github\.com\/)?([^/\s]+)\/([^/\s#?]+)/i)
+    if (!match || repoBusy) return
+    const [, owner, repo] = match
+    const name = repo.replace(/\.git$/i, '')
+    setRepoBusy(true)
+    try {
+      const response = await fetch(`https://api.github.com/repos/${owner}/${name}/zipball`, {
+        headers: { Accept: 'application/vnd.github+json' },
+      })
+      if (!response.ok) throw new Error(`GitHub respondeu ${response.status}`)
+      const zip = await JSZip.loadAsync(await response.blob())
+      const entries: WorkspaceEntry[] = []
+      for (const [path, item] of Object.entries(zip.files)) {
+        const clean = normalizePath(path)
+        const relative = clean.split('/').slice(1).join('/')
+        if (!relative || relative.includes('__MACOSX')) continue
+        if (item.dir) entries.push({ path: relative, type: 'dir', updatedAt: Date.now() })
+        else entries.push(await entryFromZipItem(relative, item))
+      }
+      if (!workspaceRef.current || !entries.length) return
+      const conflicts = entries.filter((entry) => entry.type === 'file' && workspaceRef.current?.[entry.path])
+      const replaceExisting = conflicts.length > 0 && window.confirm(
+        `O repositório contém ${conflicts.length} arquivo(s) que já existem. OK substitui os locais; Cancelar importa com novos nomes.`,
+      )
+      const draft = { ...workspaceRef.current }
+      const finalPaths = new Map<string, string>()
+      for (const entry of entries) {
+        if (entry.type === 'dir') {
+          createDir(draft, entry.path)
+          continue
+        }
+        let finalPath = entry.path
+        if (draft[finalPath] && !replaceExisting) finalPath = uniquePath(draft, finalPath)
+        const parent = dirname(finalPath)
+        if (parent) createDir(draft, parent)
+        draft[finalPath] = { ...entry, path: finalPath }
+        finalPaths.set(entry.path, finalPath)
+      }
+      workspaceRef.current = draft
+      setWorkspace(draft)
+      saveWorkspace(draft)
+      const readme = entries.find((entry) => /(^|\/)readme\.md$/i.test(entry.path))
+      if (readme) {
+        setSelectedPath(finalPaths.get(readme.path) ?? readme.path)
+        setMode('preview')
+      }
+      setRepoUrl('')
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Não foi possível importar o repositório.')
+    } finally {
+      setRepoBusy(false)
+    }
+  }
+
   async function exportZip() {
     if (!workspace) return
     const zip = new JSZip()
@@ -484,6 +543,20 @@ function App() {
             {templateFiles.map(([path, content]) => (
               <button type="button" key={path} onClick={() => addTemplate(path, content)}>{path}</button>
             ))}
+          </div>
+        </details>
+
+        <details className="template-menu repo-import">
+          <summary><RepoIcon size={14} /> Importar repo <ChevronDownIcon size={14} /></summary>
+          <div className="repo-import-form">
+            <input
+              value={repoUrl}
+              onChange={(event) => setRepoUrl(event.target.value)}
+              onKeyDown={(event) => { if (event.key === 'Enter') void importRepository() }}
+              placeholder="owner/repo ou URL"
+              aria-label="Repositório GitHub"
+            />
+            <button type="button" disabled={repoBusy || !repoUrl.trim()} onClick={() => void importRepository()}>{repoBusy ? 'Importando…' : 'Importar'}</button>
           </div>
         </details>
 
