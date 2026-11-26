@@ -2,9 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   BookIcon,
   ChevronDownIcon,
-  ChevronRightIcon,
   CodeIcon,
-  DownloadIcon,
   EyeIcon,
   FileCodeIcon,
   FileDirectoryIcon,
@@ -16,7 +14,6 @@ import {
   IssueOpenedIcon,
   PencilIcon,
   PlayIcon,
-  PlusIcon,
   ProjectIcon,
   RepoForkedIcon,
   RepoIcon,
@@ -24,15 +21,13 @@ import {
   StarIcon,
   TagIcon,
   TrashIcon,
-  UploadIcon,
   GitPullRequestIcon,
-  MoonIcon,
-  SunIcon,
 } from '@primer/octicons-react'
 import markdownDarkUrl from 'github-markdown-css/github-markdown-dark.css?url'
 import markdownLightUrl from 'github-markdown-css/github-markdown-light.css?url'
 import './App.css'
 import {
+  basename,
   buildTree,
   createDir,
   createFile,
@@ -190,13 +185,13 @@ function App() {
   const [theme, setTheme] = useState<ThemeName>(initialTheme)
   const [ownerName, setOwnerName] = useState(() => window.localStorage.getItem('renderme-owner') || 'user')
   const [projectName, setProjectName] = useState(() => window.localStorage.getItem('renderme-project') || 'project')
-  const [chooser, setChooser] = useState<'new' | 'upload' | null>(null)
+  const [chooser, setChooser] = useState<'add' | 'code' | null>(null)
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [repoUrl, setRepoUrl] = useState('')
   const [repoBusy, setRepoBusy] = useState(false)
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [selectedPath, setSelectedPath] = useState('README.md')
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(['.github', '.github/assets', '.github/ISSUE_TEMPLATE', 'docs']))
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [mode, setMode] = useState<'preview' | 'edit'>('preview')
   const fileInput = useRef<HTMLInputElement>(null)
   const folderInput = useRef<HTMLInputElement>(null)
@@ -536,27 +531,20 @@ function App() {
     if (path) selectEntry(path)
   }
 
-  function renderTree(nodes: TreeNode[], depth = 0) {
+  function renderFileRows(nodes: TreeNode[], depth = 0): React.ReactNode {
     return nodes.map((node) => {
       const open = expanded.has(node.path)
       const active = activePath === node.path
       return (
         <div key={node.path}>
-          <div
-            className={`tree-row ${active ? 'active' : ''}`}
-            style={{ paddingInlineStart: 8 + depth * 14 }}
-          >
+          <div className={`file-row ${active ? 'active' : ''}`}>
             <button
               type="button"
-              className="tree-main"
-              role="treeitem"
-              aria-selected={active}
+              className="file-link"
+              style={{ paddingInlineStart: depth * 18 }}
               onClick={() => node.type === 'dir' ? toggleDir(node.path) : selectEntry(node.path)}
               aria-expanded={node.type === 'dir' ? open : undefined}
             >
-              {node.type === 'dir' ? (
-                open ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />
-              ) : <span className="tree-spacer" />}
               {node.type === 'dir' ? <FileDirectoryIcon size={16} /> : isMarkdown(node.path) ? <FileCodeIcon size={16} /> : <FileIcon size={16} />}
               {renamingPath === node.path ? (
                 <input
@@ -571,14 +559,16 @@ function App() {
                   }}
                   onBlur={(event) => commitRename(node.path, event.currentTarget.value)}
                 />
-              ) : <span className="tree-name">{node.name}</span>}
+              ) : <span>{node.name}</span>}
             </button>
-            <span className="tree-actions">
+            <span className="commit-message">{node.type === 'dir' ? 'chore: update repository assets' : `docs: update ${node.name.toLowerCase()}`}</span>
+            <span className="file-age">now</span>
+            <span className="file-actions">
               <button type="button" aria-label={`Renomear ${node.path}`} onClick={() => promptRename(node.path)}><PencilIcon size={13} /></button>
               <button type="button" aria-label={`Excluir ${node.path}`} onClick={() => removePath(node.path)}><TrashIcon size={13} /></button>
             </span>
           </div>
-          {node.type === 'dir' && open ? renderTree(node.children, depth + 1) : null}
+          {node.type === 'dir' && open ? renderFileRows(node.children, depth + 1) : null}
         </div>
       )
     })
@@ -593,98 +583,13 @@ function App() {
 
   return (
     <div className="app-shell">
-      <aside className="workspace-sidebar" aria-label="Explorador de arquivos local">
-        <div className="brand-row">
-          <div>
-            <strong>renderme</strong>
-          </div>
-          <div className="brand-actions">
-            <button
-              type="button"
-              className="theme-toggle"
-              aria-label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            >
-              {theme === 'dark' ? <SunIcon size={14} /> : <MoonIcon size={14} />}
-            </button>
-          </div>
-        </div>
-
-        <div className="side-actions">
-          <span className="action-choice">
-            <button type="button" onClick={() => setChooser(chooser === 'new' ? null : 'new')}><PlusIcon size={14} /> Novo</button>
-            {chooser === 'new' ? <span className="choice-menu"><button type="button" onClick={() => { setChooser(null); promptNewFile() }}>Arquivo</button><button type="button" onClick={() => { setChooser(null); promptNewFolder() }}>Pasta</button></span> : null}
-          </span>
-          <span className="action-choice">
-            <button type="button" onClick={() => setChooser(chooser === 'upload' ? null : 'upload')}><UploadIcon size={14} /> Upload</button>
-            {chooser === 'upload' ? <span className="choice-menu"><button type="button" onClick={() => { setChooser(null); fileInput.current?.click() }}>Arquivo</button><button type="button" onClick={() => { setChooser(null); folderInput.current?.click() }}>Pasta</button></span> : null}
-          </span>
-          <button type="button" onClick={() => zipInput.current?.click()}><BookIcon size={14} /> Importar ZIP</button>
-          <button type="button" className="primary" onClick={exportZip}><DownloadIcon size={14} /> Exportar ZIP</button>
-        </div>
-
-        <details className="template-menu">
-          <summary><PlusIcon size={14} /> Templates <ChevronDownIcon size={14} /></summary>
-          <div>
-            <button type="button" onClick={addCommunityFiles}>GitHub community files</button>
-            {templateFiles.map(([path, content]) => (
-              <button type="button" key={path} onClick={() => addTemplate(path, content)}>{path}</button>
-            ))}
-          </div>
-        </details>
-
-        <details className="template-menu repo-import">
-          <summary><RepoIcon size={14} /> Importar repo <ChevronDownIcon size={14} /></summary>
-          <div className="repo-import-form">
-            <input
-              value={repoUrl}
-              onChange={(event) => setRepoUrl(event.target.value)}
-              onKeyDown={(event) => { if (event.key === 'Enter') void importRepository() }}
-              placeholder="owner/repo ou URL"
-              aria-label="Repositório GitHub"
-            />
-            <button type="button" disabled={repoBusy || !repoUrl.trim()} onClick={() => void importRepository()}>{repoBusy ? 'Importando…' : 'Importar'}</button>
-          </div>
-        </details>
-
-        <div className="tree" role="tree">
-          {renderTree(tree)}
-        </div>
-
-        <button
-          type="button"
-          className="reset-button"
-          onClick={() => {
-            if (window.confirm('Restaurar o exemplo e apagar o workspace atual?')) {
-              void resetWorkspace().then((sample) => {
-                workspaceRef.current = sample
-                setWorkspace(sample)
-                setSelectedPath('README.md')
-                setMode('preview')
-              })
-            }
-          }}
-        >
-          Restaurar exemplo
-        </button>
-      </aside>
-
       <main className="stage">
         <div className="github-frame">
           <section className="repo-hero">
-            <div className="repo-title-row">
-              <div className="repo-title">
-                <RepoIcon size={16} />
-                <button type="button" className="identity-link" onClick={() => editIdentity('owner')}>{ownerName}</button>
-                <span>/</span>
-                <button type="button" className="identity-link repo-name" onClick={() => editIdentity('project')}>{projectName}</button>
-                <span className="visibility">Public</span>
-              </div>
-              <div className="repo-actions">
-                <button type="button"><EyeIcon size={16} /> Watch <strong>8</strong></button>
-                <button type="button"><RepoForkedIcon size={16} /> Fork <strong>12</strong></button>
-                <button type="button"><StarIcon size={16} /> Star <strong>128</strong></button>
-              </div>
+            <div className="repo-breadcrumb">
+              <button type="button" className="identity-link" onClick={() => editIdentity('owner')}>{ownerName}</button>
+              <span>/</span>
+              <button type="button" className="identity-link" onClick={() => editIdentity('project')}>{projectName}</button>
             </div>
             <nav className="repo-tabs" aria-label="Repository">
               <span className="active"><CodeIcon size={16} /> Code</span>
@@ -696,6 +601,18 @@ function App() {
               <span><GraphIcon size={16} /> Insights</span>
               <span><GearIcon size={16} /> Settings</span>
             </nav>
+            <div className="repo-title-row">
+              <div className="repo-title">
+                <RepoIcon size={16} />
+                <button type="button" className="identity-link repo-name" onClick={() => editIdentity('project')}>{projectName}</button>
+                <span className="visibility">Public</span>
+              </div>
+              <div className="repo-actions">
+                <button type="button"><EyeIcon size={16} /> Watch <strong>8</strong></button>
+                <button type="button"><RepoForkedIcon size={16} /> Fork <strong>12</strong></button>
+                <button type="button"><StarIcon size={16} /> Star <strong>128</strong></button>
+              </div>
+            </div>
           </section>
 
           <section className="repo-browser">
@@ -707,8 +624,56 @@ function App() {
                   <span className="branch-meta"><TagIcon size={13} /> <strong>0</strong> Tags</span>
                   <div className="browser-actions">
                     <label className="go-file"><span>Go to file</span><kbd>t</kbd></label>
-                    <button type="button" className="green">Add file <ChevronDownIcon size={14} /></button>
-                    <button type="button" className="green strong"><CodeIcon size={14} /> Code <ChevronDownIcon size={14} /></button>
+                    <span className="action-choice">
+                      <button type="button" className="green" onClick={() => setChooser(chooser === 'add' ? null : 'add')}>Add file <ChevronDownIcon size={14} /></button>
+                      {chooser === 'add' ? (
+                        <span className="choice-menu browser-menu">
+                          <button type="button" onClick={() => { setChooser(null); promptNewFile() }}>Create new file</button>
+                          <button type="button" onClick={() => { setChooser(null); promptNewFolder() }}>Create new folder</button>
+                          <button type="button" onClick={() => { setChooser(null); fileInput.current?.click() }}>Upload files</button>
+                          <button type="button" onClick={() => { setChooser(null); folderInput.current?.click() }}>Upload folder</button>
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="action-choice">
+                      <button type="button" className="green strong" onClick={() => setChooser(chooser === 'code' ? null : 'code')}><CodeIcon size={14} /> Code <ChevronDownIcon size={14} /></button>
+                      {chooser === 'code' ? (
+                        <span className="choice-menu browser-menu code-menu">
+                          <div className="menu-section">Local workspace</div>
+                          <button type="button" onClick={() => { setChooser(null); zipInput.current?.click() }}>Import ZIP</button>
+                          <button type="button" onClick={() => { setChooser(null); void exportZip() }}>Export ZIP</button>
+                          <div className="menu-section">Import repository</div>
+                          <span className="menu-input-row">
+                            <input
+                              value={repoUrl}
+                              onChange={(event) => setRepoUrl(event.target.value)}
+                              onKeyDown={(event) => { if (event.key === 'Enter') void importRepository() }}
+                              placeholder="owner/repo"
+                              aria-label="Repositório GitHub"
+                            />
+                            <button type="button" disabled={repoBusy || !repoUrl.trim()} onClick={() => void importRepository()}>{repoBusy ? '…' : 'Import'}</button>
+                          </span>
+                          <div className="menu-section">Templates</div>
+                          <button type="button" onClick={() => { setChooser(null); addCommunityFiles() }}>GitHub community files</button>
+                          {templateFiles.map(([path, content]) => (
+                            <button type="button" key={path} onClick={() => { setChooser(null); addTemplate(path, content) }}>{path}</button>
+                          ))}
+                          <div className="menu-section">Workspace</div>
+                          <button type="button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? 'Use light theme' : 'Use dark theme'}</button>
+                          <button type="button" className="danger" onClick={() => {
+                            setChooser(null)
+                            if (window.confirm('Restaurar o exemplo e apagar o workspace atual?')) {
+                              void resetWorkspace().then((sample) => {
+                                workspaceRef.current = sample
+                                setWorkspace(sample)
+                                setSelectedPath('README.md')
+                                setMode('preview')
+                              })
+                            }
+                          }}>Restore example</button>
+                        </span>
+                      ) : null}
+                    </span>
                   </div>
                 </div>
 
@@ -717,35 +682,13 @@ function App() {
                     <div className="committer"><span className="mini-avatar">{ownerName.slice(0, 1).toUpperCase()}</span><strong>{ownerName}</strong><span>local preview</span></div>
                     <span className="commit-count"><HistoryIcon size={13} /> <strong>{count}</strong> Commits</span>
                   </div>
-                  {tree.map((node) => (
-                    <div className={`file-row ${activePath === node.path ? 'active' : ''}`} key={node.path}>
-                      <button
-                        type="button"
-                        className="file-link"
-                        onClick={() => node.type === 'dir' ? toggleDir(node.path) : selectEntry(node.path)}
-                      >
-                        {node.type === 'dir' ? <FileDirectoryIcon size={16} /> : isMarkdown(node.path) ? <FileCodeIcon size={16} /> : <FileIcon size={16} />}
-                        <span>{node.name}</span>
-                      </button>
-                      <span className="commit-message">{node.type === 'dir' ? 'chore: update repository assets' : `docs: update ${node.name.toLowerCase()}`}</span>
-                      <span className="file-age">now</span>
-                    </div>
-                  ))}
+                  {renderFileRows(tree)}
                 </div>
 
                 <article className="readme-card">
                   <header className="readme-header">
-                    <nav className="readme-tabs" aria-label="Arquivos do repositório">
-                      {[
-                        ['README.md', 'README'],
-                        ['CONTRIBUTING.md', 'Contributing'],
-                        ['LICENSE', 'Apache-2.0 license'],
-                        ['SECURITY.md', 'Security'],
-                      ].filter(([path]) => workspace?.[path]).map(([path, label]) => (
-                        <button type="button" className={activePath === path ? 'active' : ''} key={path} onClick={() => selectEntry(path)}>
-                          {label}
-                        </button>
-                      ))}
+                    <nav className="readme-tabs" aria-label="Arquivo atual">
+                      <button type="button" className="active">{basename(activePath).replace(/\.md$/i, '') || activePath}</button>
                     </nav>
                     <span className="readme-meta">{lineCount} lines · {bytes} bytes</span>
                     {selected?.type === 'file' && selected.content !== undefined ? (
@@ -757,7 +700,7 @@ function App() {
                   </header>
 
                   {selected?.type !== 'file' ? (
-                    <div className="empty-state">Selecione um arquivo no explorador.</div>
+                    <div className="empty-state">Selecione um arquivo na lista do repositório.</div>
                   ) : mode === 'edit' && selected.content !== undefined ? (
                     <textarea
                       className="markdown-editor"
