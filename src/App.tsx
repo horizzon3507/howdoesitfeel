@@ -45,7 +45,6 @@ import {
   isImage,
   isMarkdown,
   isProbablyText,
-  joinPath,
   normalizePath,
   renamePath,
   toBase64,
@@ -139,6 +138,7 @@ function App() {
   const [theme, setTheme] = useState<ThemeName>(initialTheme)
   const [ownerName, setOwnerName] = useState(() => window.localStorage.getItem('renderme-owner') || 'user')
   const [projectName, setProjectName] = useState(() => window.localStorage.getItem('renderme-project') || 'project')
+  const [chooser, setChooser] = useState<'new' | 'upload' | null>(null)
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [selectedPath, setSelectedPath] = useState('README.md')
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['.github', '.github/assets', '.github/ISSUE_TEMPLATE', 'docs']))
@@ -162,6 +162,22 @@ function App() {
     }
     link.href = theme === 'dark' ? markdownDarkUrl : markdownLightUrl
   }, [theme])
+
+  useEffect(() => {
+    if (!chooser) return
+    const close = (event: PointerEvent) => {
+      if (!(event.target instanceof Element) || !event.target.closest('.action-choice')) setChooser(null)
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setChooser(null)
+    }
+    document.addEventListener('pointerdown', close)
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('pointerdown', close)
+      document.removeEventListener('keydown', escape)
+    }
+  }, [chooser])
 
   useEffect(() => {
     void loadWorkspace().then((loaded) => {
@@ -237,23 +253,20 @@ function App() {
   }
 
   function promptNewFile() {
-    const suggested = selected?.type === 'dir' ? joinPath(selected.path, 'untitled.md') : joinPath(dirname(selectedPath), 'untitled.md')
-    const input = window.prompt('Caminho do novo arquivo', suggested)
-    if (!input) return
     mutate((draft) => {
-      const path = uniquePath(draft, input)
-      createFile(draft, path, isMarkdown(path) ? '# Novo arquivo\n' : '', guessMime(path))
+      const path = uniquePath(draft, 'untitled.md')
+      createFile(draft, path, '# Novo arquivo\n', guessMime(path))
       setSelectedPath(path)
       setMode('edit')
     })
   }
 
   function promptNewFolder() {
-    const input = window.prompt('Caminho da nova pasta', '.github/assets')
-    if (!input) return
-    mutate((draft) => createDir(draft, input))
-    const clean = normalizePath(input)
-    setExpanded((current) => new Set(current).add(clean))
+    mutate((draft) => {
+      const path = uniquePath(draft, 'new-folder')
+      createDir(draft, path)
+      setExpanded((current) => new Set(current).add(path))
+    })
   }
 
   function promptRename(path: string) {
@@ -433,8 +446,14 @@ function App() {
         </div>
 
         <div className="side-actions">
-          <button type="button" onClick={() => window.confirm('OK cria arquivo; Cancelar cria pasta.') ? promptNewFile() : promptNewFolder()}><PlusIcon size={14} /> Novo</button>
-          <button type="button" onClick={() => (window.confirm('OK envia arquivo(s); Cancelar envia pasta.') ? fileInput : folderInput).current?.click()}><UploadIcon size={14} /> Upload</button>
+          <span className="action-choice">
+            <button type="button" onClick={() => setChooser(chooser === 'new' ? null : 'new')}><PlusIcon size={14} /> Novo</button>
+            {chooser === 'new' ? <span className="choice-menu"><button type="button" onClick={() => { setChooser(null); promptNewFile() }}>Arquivo</button><button type="button" onClick={() => { setChooser(null); promptNewFolder() }}>Pasta</button></span> : null}
+          </span>
+          <span className="action-choice">
+            <button type="button" onClick={() => setChooser(chooser === 'upload' ? null : 'upload')}><UploadIcon size={14} /> Upload</button>
+            {chooser === 'upload' ? <span className="choice-menu"><button type="button" onClick={() => { setChooser(null); fileInput.current?.click() }}>Arquivo</button><button type="button" onClick={() => { setChooser(null); folderInput.current?.click() }}>Pasta</button></span> : null}
+          </span>
           <button type="button" onClick={() => zipInput.current?.click()}><BookIcon size={14} /> Importar ZIP</button>
           <button type="button" className="primary" onClick={exportZip}><DownloadIcon size={14} /> Exportar ZIP</button>
         </div>

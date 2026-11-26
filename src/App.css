@@ -1141,3 +1141,36 @@
   height: 16px;
   flex: 0 0 auto;
 }
+
+.action-choice {
+  position: relative;
+  display: flex;
+}
+
+.action-choice > button {
+  width: 100%;
+}
+
+.choice-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  display: grid;
+  min-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--bg-default);
+  box-shadow: 0 8px 24px var(--frame-shadow);
+}
+
+.choice-menu button {
+  border: 0;
+  border-radius: 0;
+  background: var(--bg-default);
+}
+
+.choice-menu button:hover {
+  background: var(--control-hover);
+}
