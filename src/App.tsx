@@ -433,10 +433,8 @@ function App() {
         </div>
 
         <div className="side-actions">
-          <button type="button" onClick={promptNewFile}><PlusIcon size={14} /> Novo</button>
-          <button type="button" onClick={promptNewFolder}><FileDirectoryIcon size={14} /> Novo</button>
-          <button type="button" onClick={() => fileInput.current?.click()}><UploadIcon size={14} /> Upload</button>
-          <button type="button" onClick={() => folderInput.current?.click()}><UploadIcon size={14} /> Upload</button>
+          <button type="button" onClick={() => window.confirm('OK cria arquivo; Cancelar cria pasta.') ? promptNewFile() : promptNewFolder()}><PlusIcon size={14} /> Novo</button>
+          <button type="button" onClick={() => (window.confirm('OK envia arquivo(s); Cancelar envia pasta.') ? fileInput : folderInput).current?.click()}><UploadIcon size={14} /> Upload</button>
           <button type="button" onClick={() => zipInput.current?.click()}><BookIcon size={14} /> Importar ZIP</button>
           <button type="button" className="primary" onClick={exportZip}><DownloadIcon size={14} /> Exportar ZIP</button>
         </div>
