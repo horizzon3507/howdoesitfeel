@@ -28,5 +28,6 @@
     "typescript": "~7.0.2",
     "vite": "^8.4.0",
     "wrangler": "^4.168.0"
-  }
+  },
+  "license": "Apache-2.0"
 }
