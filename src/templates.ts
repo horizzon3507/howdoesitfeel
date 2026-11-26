@@ -1,4 +1,4 @@
-export const sampleReadme = `# howdoesitfeel
+export const sampleReadme = `# renderme
 
 A local-first README studio that recreates the GitHub repository preview you know — right down to the repo chrome, markdown body and file context.
 
@@ -6,7 +6,7 @@ A local-first README studio that recreates the GitHub repository preview you kno
 
 ## Why
 
-README files are rarely just markdown. They depend on relative images, docs links, badges, license files and the surrounding GitHub interface. **howdoesitfeel** makes that final rendering feel immediate before anything leaves your machine.
+README files are rarely just markdown. They depend on relative images, docs links, badges, license files and the surrounding GitHub interface. **renderme** makes that final rendering feel immediate before anything leaves your machine.
 
 ## Features
 

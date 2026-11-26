@@ -1,6 +1,6 @@
 # Changelog
 
-We follow [Semantic Versioning](https://semver.org/) and [Keep a Changelog](https://keepachangelog.com/). howdoesitfeel is a single Web surface.
+We follow [Semantic Versioning](https://semver.org/) and [Keep a Changelog](https://keepachangelog.com/). renderme is a single Web surface.
 
 <details>
 <summary>To see more about versioning, expand this.</summary>

@@ -1,4 +1,4 @@
-# howdoesitfeel
+# renderme
 
 A local-first README studio that recreates the GitHub repository preview before you push.
 
