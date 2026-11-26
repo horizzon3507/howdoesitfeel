@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.2.0 · 26/11/2026
+
+Adds the ui-sdk foundation for the next component pass, project branding assets, editable repository identity, closer GitHub chrome parity, social previews and the Apache-2.0 license. This version was made for Web with a stable release channel on 26/11/2026 (v0.2.0).
+
 We follow [Semantic Versioning](https://semver.org/) and [Keep a Changelog](https://keepachangelog.com/). renderme is a single Web surface.
 
 <details>
