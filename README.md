@@ -8,8 +8,10 @@ A local-first README studio that recreates the GitHub repository preview before 
 - File explorer with folders, uploads, rename and delete
 - Relative image resolution for assets such as `.github/assets/preview.svg`
 - LICENSE, CONTRIBUTING, CODE_OF_CONDUCT and `.github` templates
+- Public GitHub repository imports
 - ZIP import/export
 - Browser-local persistence with IndexedDB
+- Responsive collapsible workspace layout
 - Static Cloudflare Workers deployment
 
 ## Branding
