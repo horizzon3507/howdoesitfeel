@@ -403,7 +403,7 @@ function App() {
       <aside className="workspace-sidebar" aria-label="Explorador de arquivos local">
         <div className="brand-row">
           <div>
-            <strong>renderme</strong>
+            <strong><img className="brand-logo" src="/logo.svg" alt="" /> renderme</strong>
             <span>workspace local</span>
           </div>
           <div className="brand-actions">
