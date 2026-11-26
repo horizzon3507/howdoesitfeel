@@ -52,7 +52,7 @@ import {
   uniquePath,
 } from './fsUtils'
 import { renderMarkdown } from './markdown'
-import { loadWorkspace, resetWorkspace, saveWorkspace } from './storage'
+import { loadWorkspace, resetWorkspace, saveWorkspace, subscribeWorkspace } from './storage'
 import {
   codeOfConductTemplate,
   contributingTemplate,
@@ -79,22 +79,44 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
+function decodeTextBytes(bytes: Uint8Array) {
+  try {
+    if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+      return new TextDecoder('utf-16le', { fatal: true }).decode(bytes).replace(/^\uFEFF/, '')
+    }
+    if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+      return new TextDecoder('utf-16be', { fatal: true }).decode(bytes).replace(/^\uFEFF/, '')
+    }
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/^\uFEFF/, '')
+  } catch {
+    return null
+  }
+}
+
 async function entryFromFile(file: File, forcedPath?: string): Promise<WorkspaceEntry> {
   const path = normalizePath(forcedPath || file.webkitRelativePath || file.name)
   const mime = file.type || guessMime(path)
-  if (isProbablyText(path, mime)) {
-    return {
-      path,
-      type: 'file',
-      content: await file.text(),
-      mime,
-      updatedAt: Date.now(),
-    }
-  }
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const content = isProbablyText(path, mime) ? decodeTextBytes(bytes) : null
   return {
     path,
     type: 'file',
-    data: toBase64(new Uint8Array(await file.arrayBuffer())),
+    content: content ?? undefined,
+    data: toBase64(bytes),
+    mime,
+    updatedAt: Date.now(),
+  }
+}
+
+async function entryFromZipItem(path: string, item: JSZip.JSZipObject): Promise<WorkspaceEntry> {
+  const mime = guessMime(path)
+  const bytes = await item.async('uint8array')
+  const content = isProbablyText(path, mime) ? decodeTextBytes(bytes) : null
+  return {
+    path,
+    type: 'file',
+    content: content ?? undefined,
+    data: toBase64(bytes),
     mime,
     updatedAt: Date.now(),
   }
@@ -114,9 +136,28 @@ function App() {
   const fileInput = useRef<HTMLInputElement>(null)
   const folderInput = useRef<HTMLInputElement>(null)
   const zipInput = useRef<HTMLInputElement>(null)
+  const workspaceRef = useRef<Workspace | null>(null)
 
   useEffect(() => {
-    void loadWorkspace().then(setWorkspace)
+    void loadWorkspace().then((loaded) => {
+      workspaceRef.current = loaded
+      setWorkspace(loaded)
+    })
+    return subscribeWorkspace((message) => {
+      if (message.type === 'reset') {
+        workspaceRef.current = message.workspace
+        setWorkspace(message.workspace)
+        return
+      }
+      setWorkspace((current) => {
+        if (!current) return current
+        const next = { ...current }
+        for (const path of message.diff.removals) delete next[path]
+        for (const entry of message.diff.upserts) next[entry.path] = { ...entry }
+        workspaceRef.current = next
+        return next
+      })
+    })
   }, [])
 
   const fallbackPath = workspace?.['README.md']?.type === 'file'
@@ -137,6 +178,7 @@ function App() {
       if (!current) return current
       const draft = { ...current }
       mutator(draft)
+      workspaceRef.current = draft
       saveWorkspace(draft)
       return draft
     })
@@ -211,9 +253,9 @@ function App() {
   }
 
   async function importFiles(files: FileList | null) {
-    if (!files?.length || !workspace) return
+    if (!files?.length || !workspaceRef.current) return
     const entries = await Promise.all(Array.from(files).map((file) => entryFromFile(file)))
-    const draft = { ...workspace }
+    const draft = { ...workspaceRef.current }
     let firstImported = ''
     for (const entry of entries) {
       const finalPath = uniquePath(draft, entry.path)
@@ -222,6 +264,7 @@ function App() {
       draft[finalPath] = { ...entry, path: finalPath }
       if (!firstImported) firstImported = finalPath
     }
+    workspaceRef.current = draft
     setWorkspace(draft)
     saveWorkspace(draft)
     if (firstImported) {
@@ -237,28 +280,35 @@ function App() {
     for (const [path, item] of Object.entries(zip.files)) {
       const clean = normalizePath(path)
       if (!clean || clean.includes('__MACOSX')) continue
-      if (item.dir) {
-        entries.push({ path: clean, type: 'dir', updatedAt: Date.now() })
-      } else if (isProbablyText(clean, guessMime(clean))) {
-        entries.push({ path: clean, type: 'file', content: await item.async('text'), mime: guessMime(clean), updatedAt: Date.now() })
-      } else {
-        entries.push({ path: clean, type: 'file', data: await item.async('base64'), mime: guessMime(clean), updatedAt: Date.now() })
-      }
+      if (item.dir) entries.push({ path: clean, type: 'dir', updatedAt: Date.now() })
+      else entries.push(await entryFromZipItem(clean, item))
     }
-    const draft = { ...workspace }
+    if (!workspaceRef.current) return
+
+    const conflicts = entries.filter((entry) => entry.type === 'file' && workspaceRef.current?.[entry.path])
+    const replaceExisting = conflicts.length > 0 && window.confirm(
+      `O ZIP contém ${conflicts.length} arquivo(s) que já existem. OK substitui os locais; Cancelar importa com novos nomes.`,
+    )
+    const draft = { ...workspaceRef.current }
+    const finalPaths = new Map<string, string>()
     for (const entry of entries) {
-      if (entry.type === 'dir') createDir(draft, entry.path)
-      else {
-        const parent = dirname(entry.path)
-        if (parent) createDir(draft, parent)
-        draft[entry.path] = entry
+      if (entry.type === 'dir') {
+        createDir(draft, entry.path)
+        continue
       }
+      let finalPath = entry.path
+      if (draft[finalPath] && !replaceExisting) finalPath = uniquePath(draft, finalPath)
+      const parent = dirname(finalPath)
+      if (parent) createDir(draft, parent)
+      draft[finalPath] = { ...entry, path: finalPath }
+      finalPaths.set(entry.path, finalPath)
     }
+    workspaceRef.current = draft
     setWorkspace(draft)
     saveWorkspace(draft)
     const readme = entries.find((entry) => /(^|\/)readme\.md$/i.test(entry.path))
     if (readme) {
-      setSelectedPath(readme.path)
+      setSelectedPath(finalPaths.get(readme.path) ?? readme.path)
       setMode('preview')
     }
   }
@@ -302,6 +352,8 @@ function App() {
             <button
               type="button"
               className="tree-main"
+              role="treeitem"
+              aria-selected={active}
               onClick={() => node.type === 'dir' ? toggleDir(node.path) : selectEntry(node.path)}
               aria-expanded={node.type === 'dir' ? open : undefined}
             >
@@ -326,7 +378,7 @@ function App() {
     return <div className="loading">Carregando workspace local…</div>
   }
 
-  const readmeName = basename(selectedPath)
+  const readmeName = basename(activePath)
   const lineCount = selected?.content?.split('\n').length ?? 0
   const bytes = selected?.type === 'file' ? entryBytes(selected).length : 0
 
@@ -370,6 +422,7 @@ function App() {
           onClick={() => {
             if (window.confirm('Restaurar o exemplo e apagar o workspace atual?')) {
               void resetWorkspace().then((sample) => {
+                workspaceRef.current = sample
                 setWorkspace(sample)
                 setSelectedPath('README.md')
                 setMode('preview')
@@ -451,8 +504,8 @@ function App() {
             <article className="readme-card">
               <header className="readme-header">
                 <span className="readme-title"><BookIcon size={16} /> {readmeName}</span>
-                {selected?.type === 'file' && isMarkdown(selected.path) ? (
-                  <div className="mode-switch" role="tablist" aria-label="Modo do markdown">
+                {selected?.type === 'file' && selected.content !== undefined ? (
+                  <div className="mode-switch" role="tablist" aria-label="Modo do arquivo">
                     <button type="button" className={mode === 'preview' ? 'active' : ''} onClick={() => setMode('preview')}>Preview</button>
                     <button type="button" className={mode === 'edit' ? 'active' : ''} onClick={() => setMode('edit')}>Edit</button>
                   </div>
@@ -461,7 +514,7 @@ function App() {
 
               {selected?.type !== 'file' ? (
                 <div className="empty-state">Selecione um arquivo no explorador.</div>
-              ) : isMarkdown(selected.path) && mode === 'edit' ? (
+              ) : mode === 'edit' && selected.content !== undefined ? (
                 <textarea
                   className="markdown-editor"
                   value={selected.content ?? ''}
