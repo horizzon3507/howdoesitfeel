@@ -365,7 +365,6 @@ function App() {
                   className="markdown-editor"
                   value={selected.content ?? ''}
                   spellCheck={false}
-                  readOnly
                   onChange={(event) => {
                     const value = event.target.value
                     mutate((draft) => {
