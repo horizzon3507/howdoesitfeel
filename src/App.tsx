@@ -139,6 +139,7 @@ function App() {
   const [ownerName, setOwnerName] = useState(() => window.localStorage.getItem('renderme-owner') || 'user')
   const [projectName, setProjectName] = useState(() => window.localStorage.getItem('renderme-project') || 'project')
   const [chooser, setChooser] = useState<'new' | 'upload' | null>(null)
+  const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [selectedPath, setSelectedPath] = useState('README.md')
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['.github', '.github/assets', '.github/ISSUE_TEMPLATE', 'docs']))
@@ -258,6 +259,7 @@ function App() {
       createFile(draft, path, '# Novo arquivo\n', guessMime(path))
       setSelectedPath(path)
       setMode('edit')
+      setRenamingPath(path)
     })
   }
 
@@ -266,19 +268,23 @@ function App() {
       const path = uniquePath(draft, 'new-folder')
       createDir(draft, path)
       setExpanded((current) => new Set(current).add(path))
+      setRenamingPath(path)
+    })
+  }
+
+  function commitRename(path: string, input: string) {
+    const nextPath = normalizePath(input)
+    setRenamingPath(null)
+    if (!nextPath || nextPath === path) return
+    mutate((draft) => {
+      if (renamePath(draft, path, nextPath) && (selectedPath === path || selectedPath.startsWith(`${path}/`))) {
+        setSelectedPath(nextPath + selectedPath.slice(path.length))
+      }
     })
   }
 
   function promptRename(path: string) {
-    const input = window.prompt('Novo caminho', path)
-    if (!input || input === path) return
-    mutate((draft) => {
-      if (renamePath(draft, path, input)) {
-        if (selectedPath === path || selectedPath.startsWith(`${path}/`)) {
-          setSelectedPath(normalizePath(input) + selectedPath.slice(path.length))
-        }
-      }
-    })
+    setRenamingPath(path)
   }
 
   function removePath(path: string) {
@@ -406,7 +412,20 @@ function App() {
                 open ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />
               ) : <span className="tree-spacer" />}
               {node.type === 'dir' ? <FileDirectoryIcon size={16} /> : isMarkdown(node.path) ? <FileCodeIcon size={16} /> : <FileIcon size={16} />}
-              <span className="tree-name">{node.name}</span>
+              {renamingPath === node.path ? (
+                <input
+                  className="tree-rename"
+                  defaultValue={node.path}
+                  autoFocus
+                  onFocus={(event) => event.currentTarget.select()}
+                  onClick={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') commitRename(node.path, event.currentTarget.value)
+                    if (event.key === 'Escape') setRenamingPath(null)
+                  }}
+                  onBlur={(event) => commitRename(node.path, event.currentTarget.value)}
+                />
+              ) : <span className="tree-name">{node.name}</span>}
             </button>
             <span className="tree-actions">
               <button type="button" aria-label={`Renomear ${node.path}`} onClick={() => promptRename(node.path)}><PencilIcon size={13} /></button>
