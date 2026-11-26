@@ -29,6 +29,7 @@ npm run lint
 ## Deploy to Cloudflare Workers
 
 ```sh
+npm run build
 npx wrangler deploy
 ```
 
