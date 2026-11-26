@@ -142,6 +142,7 @@ function App() {
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [repoUrl, setRepoUrl] = useState('')
   const [repoBusy, setRepoBusy] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(() => !window.matchMedia('(max-width: 1200px)').matches)
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [selectedPath, setSelectedPath] = useState('README.md')
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['.github', '.github/assets', '.github/ISSUE_TEMPLATE', 'docs']))
@@ -506,12 +507,21 @@ function App() {
 
   return (
     <div className="app-shell">
-      <aside className="workspace-sidebar" aria-label="Explorador de arquivos local">
+      <aside className={`workspace-sidebar ${sidebarOpen ? '' : 'collapsed'}`} aria-label="Explorador de arquivos local">
         <div className="brand-row">
           <div>
             <strong>renderme</strong>
           </div>
           <div className="brand-actions">
+            <button
+              type="button"
+              className="theme-toggle"
+              aria-label={sidebarOpen ? 'Recolher explorador' : 'Expandir explorador'}
+              aria-expanded={sidebarOpen}
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+            >
+              {sidebarOpen ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
+            </button>
             <button
               type="button"
               className="theme-toggle"
