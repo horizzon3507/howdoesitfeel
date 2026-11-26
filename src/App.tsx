@@ -2,17 +2,18 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import JSZip from 'jszip'
 import {
   BookIcon,
-  CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   CodeIcon,
-  CopyIcon,
   DownloadIcon,
   EyeIcon,
   FileCodeIcon,
   FileDirectoryIcon,
   FileIcon,
+  GearIcon,
+  GitBranchIcon,
   GraphIcon,
+  HistoryIcon,
   IssueOpenedIcon,
   PencilIcon,
   PlayIcon,
@@ -22,6 +23,7 @@ import {
   RepoIcon,
   ShieldIcon,
   StarIcon,
+  TagIcon,
   TrashIcon,
   UploadIcon,
   GitPullRequestIcon,
@@ -32,7 +34,6 @@ import markdownDarkUrl from 'github-markdown-css/github-markdown-dark.css?url'
 import markdownLightUrl from 'github-markdown-css/github-markdown-light.css?url'
 import './App.css'
 import {
-  basename,
   buildTree,
   createDir,
   createFile,
@@ -140,7 +141,6 @@ function App() {
   const [selectedPath, setSelectedPath] = useState('README.md')
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['.github', '.github/assets', '.github/ISSUE_TEMPLATE', 'docs']))
   const [mode, setMode] = useState<'preview' | 'edit'>('preview')
-  const [copied, setCopied] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
   const folderInput = useRef<HTMLInputElement>(null)
   const zipInput = useRef<HTMLInputElement>(null)
@@ -348,12 +348,6 @@ function App() {
     downloadBlob(blob, 'renderme-workspace.zip')
   }
 
-  async function copyPath() {
-    await navigator.clipboard.writeText(activePath)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1200)
-  }
-
   function handlePreviewClick(event: React.MouseEvent<HTMLElement>) {
     const anchor = (event.target as HTMLElement).closest('a[data-local-path]')
     if (!anchor) return
@@ -401,7 +395,6 @@ function App() {
     return <div className="loading">Carregando workspace local…</div>
   }
 
-  const readmeName = basename(activePath)
   const lineCount = selected?.content?.split('\n').length ?? 0
   const bytes = selected?.type === 'file' ? entryBytes(selected).length : 0
 
@@ -489,73 +482,127 @@ function App() {
               <span><GitPullRequestIcon size={16} /> Pull requests <em>1</em></span>
               <span><PlayIcon size={16} /> Actions</span>
               <span><ProjectIcon size={16} /> Projects</span>
-              <span><BookIcon size={16} /> Wiki</span>
-              <span><ShieldIcon size={16} /> Security</span>
+              <span><ShieldIcon size={16} /> Security and quality</span>
               <span><GraphIcon size={16} /> Insights</span>
+              <span><GearIcon size={16} /> Settings</span>
             </nav>
           </section>
 
           <section className="repo-browser">
-            <div className="browser-toolbar">
-              <button type="button" className="branch-button"><CodeIcon size={14} /> main <ChevronDownIcon size={14} /></button>
-              <span className="file-count"><strong>{count}</strong> files</span>
-              <div className="browser-actions">
-                <button type="button" onClick={copyPath}>{copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />} {copied ? 'Copied' : 'Copy path'}</button>
-                <button type="button" className="green">Add file <ChevronDownIcon size={14} /></button>
-                <button type="button" className="green strong"><CodeIcon size={14} /> Code <ChevronDownIcon size={14} /></button>
-              </div>
-            </div>
-
-            <div className="file-panel">
-              <div className="file-panel-header">
-                <div className="committer"><span className="mini-avatar">H</span><strong>horizzon3507</strong><span>local preview</span></div>
-                <span>now</span>
-              </div>
-              <div className="path-row">
-                <span className="path-label">{activePath}</span>
-                <span>{lineCount} lines · {bytes} bytes</span>
-              </div>
-            </div>
-
-            <article className="readme-card">
-              <header className="readme-header">
-                <span className="readme-title"><BookIcon size={16} /> {readmeName}</span>
-                {selected?.type === 'file' && selected.content !== undefined ? (
-                  <div className="mode-switch" role="tablist" aria-label="Modo do arquivo">
-                    <button type="button" className={mode === 'preview' ? 'active' : ''} onClick={() => setMode('preview')}>Preview</button>
-                    <button type="button" className={mode === 'edit' ? 'active' : ''} onClick={() => setMode('edit')}>Edit</button>
+            <div className="repo-content">
+              <div className="repo-main">
+                <div className="browser-toolbar">
+                  <button type="button" className="branch-button"><GitBranchIcon size={14} /> main <ChevronDownIcon size={14} /></button>
+                  <span className="branch-meta"><GitBranchIcon size={13} /> <strong>1</strong> Branch</span>
+                  <span className="branch-meta"><TagIcon size={13} /> <strong>0</strong> Tags</span>
+                  <div className="browser-actions">
+                    <label className="go-file"><span>Go to file</span><kbd>t</kbd></label>
+                    <button type="button" className="green">Add file <ChevronDownIcon size={14} /></button>
+                    <button type="button" className="green strong"><CodeIcon size={14} /> Code <ChevronDownIcon size={14} /></button>
                   </div>
-                ) : null}
-              </header>
-
-              {selected?.type !== 'file' ? (
-                <div className="empty-state">Selecione um arquivo no explorador.</div>
-              ) : mode === 'edit' && selected.content !== undefined ? (
-                <textarea
-                  className="markdown-editor"
-                  value={selected.content ?? ''}
-                  spellCheck={false}
-                  onChange={(event) => {
-                    const value = event.target.value
-                    mutate((draft) => {
-                      if (draft[selected.path]) draft[selected.path] = { ...draft[selected.path], content: value, updatedAt: Date.now() }
-                    })
-                  }}
-                />
-              ) : isMarkdown(selected.path) ? (
-                <div
-                  className="markdown-body"
-                  onClick={handlePreviewClick}
-                  dangerouslySetInnerHTML={{ __html: html }}
-                />
-              ) : isImage(selected.path) ? (
-                <div className="asset-preview">
-                  <img src={selected.data ? `data:${selected.mime};base64,${selected.data}` : `data:${selected.mime};charset=utf-8,${encodeURIComponent(selected.content ?? '')}`} alt={selected.path} />
                 </div>
-              ) : (
-                <pre className="plain-file">{selected.content ?? 'Arquivo binário ou sem preview textual.'}</pre>
-              )}
-            </article>
+
+                <div className="file-table">
+                  <div className="file-table-header">
+                    <div className="committer"><span className="mini-avatar">H</span><strong>horizzon3507</strong><span>local preview</span></div>
+                    <span className="commit-count"><HistoryIcon size={13} /> <strong>{count}</strong> Commits</span>
+                  </div>
+                  {tree.map((node) => (
+                    <div className={`file-row ${activePath === node.path ? 'active' : ''}`} key={node.path}>
+                      <button
+                        type="button"
+                        className="file-link"
+                        onClick={() => node.type === 'dir' ? toggleDir(node.path) : selectEntry(node.path)}
+                      >
+                        {node.type === 'dir' ? <FileDirectoryIcon size={16} /> : isMarkdown(node.path) ? <FileCodeIcon size={16} /> : <FileIcon size={16} />}
+                        <span>{node.name}</span>
+                      </button>
+                      <span className="commit-message">{node.type === 'dir' ? 'chore: update repository assets' : `docs: update ${node.name.toLowerCase()}`}</span>
+                      <span className="file-age">now</span>
+                    </div>
+                  ))}
+                </div>
+
+                <article className="readme-card">
+                  <header className="readme-header">
+                    <nav className="readme-tabs" aria-label="Arquivos do repositório">
+                      {[
+                        ['README.md', 'README'],
+                        ['CONTRIBUTING.md', 'Contributing'],
+                        ['LICENSE', 'MIT license'],
+                        ['SECURITY.md', 'Security'],
+                      ].filter(([path]) => workspace?.[path]).map(([path, label]) => (
+                        <button type="button" className={activePath === path ? 'active' : ''} key={path} onClick={() => selectEntry(path)}>
+                          {label}
+                        </button>
+                      ))}
+                    </nav>
+                    <span className="readme-meta">{lineCount} lines · {bytes} bytes</span>
+                    {selected?.type === 'file' && selected.content !== undefined ? (
+                      <div className="mode-switch" role="tablist" aria-label="Modo do arquivo">
+                        <button type="button" className={mode === 'preview' ? 'active' : ''} onClick={() => setMode('preview')}>Preview</button>
+                        <button type="button" className={mode === 'edit' ? 'active' : ''} onClick={() => setMode('edit')}>Edit</button>
+                      </div>
+                    ) : null}
+                  </header>
+
+                  {selected?.type !== 'file' ? (
+                    <div className="empty-state">Selecione um arquivo no explorador.</div>
+                  ) : mode === 'edit' && selected.content !== undefined ? (
+                    <textarea
+                      className="markdown-editor"
+                      value={selected.content ?? ''}
+                      spellCheck={false}
+                      onChange={(event) => {
+                        const value = event.target.value
+                        mutate((draft) => {
+                          if (draft[selected.path]) draft[selected.path] = { ...draft[selected.path], content: value, updatedAt: Date.now() }
+                        })
+                      }}
+                    />
+                  ) : isMarkdown(selected.path) ? (
+                    <div
+                      className="markdown-body"
+                      onClick={handlePreviewClick}
+                      dangerouslySetInnerHTML={{ __html: html }}
+                    />
+                  ) : isImage(selected.path) ? (
+                    <div className="asset-preview">
+                      <img src={selected.data ? `data:${selected.mime};base64,${selected.data}` : `data:${selected.mime};charset=utf-8,${encodeURIComponent(selected.content ?? '')}`} alt={selected.path} />
+                    </div>
+                  ) : (
+                    <pre className="plain-file">{selected.content ?? 'Arquivo binário ou sem preview textual.'}</pre>
+                  )}
+                </article>
+              </div>
+
+              <aside className="about-panel">
+                <h2>About</h2>
+                <p>A local-first README studio that recreates the GitHub repository preview.</p>
+                <div className="topic-row"><span>readme</span><span>markdown</span><span>github-preview</span></div>
+                <div className="about-links">
+                  <span><BookIcon size={14} /> Readme</span>
+                  <span><ShieldIcon size={14} /> MIT license</span>
+                  <span><GraphIcon size={14} /> Activity</span>
+                  <span><StarIcon size={14} /> 128 stars</span>
+                  <span><EyeIcon size={14} /> 8 watching</span>
+                  <span><RepoForkedIcon size={14} /> 12 forks</span>
+                </div>
+                <section>
+                  <h3>Releases</h3>
+                  <p>No releases published</p>
+                </section>
+                <section>
+                  <h3>Packages</h3>
+                  <p>No packages published</p>
+                </section>
+                <section>
+                  <h3>Languages</h3>
+                  <div className="language-bar"><span /></div>
+                  <div className="language-row"><strong>Markdown</strong><span>100%</span></div>
+                </section>
+              </aside>
+            </div>
           </section>
         </div>
       </main>
