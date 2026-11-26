@@ -137,6 +137,8 @@ function initialTheme(): ThemeName {
 
 function App() {
   const [theme, setTheme] = useState<ThemeName>(initialTheme)
+  const [ownerName, setOwnerName] = useState(() => window.localStorage.getItem('renderme-owner') || 'user')
+  const [projectName, setProjectName] = useState(() => window.localStorage.getItem('renderme-project') || 'project')
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [selectedPath, setSelectedPath] = useState('README.md')
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['.github', '.github/assets', '.github/ISSUE_TEMPLATE', 'docs']))
@@ -195,6 +197,19 @@ function App() {
     if (!workspace || !selected || selected.type !== 'file' || !isMarkdown(selected.path)) return ''
     return renderMarkdown(selected.content ?? '', selected.path, workspace)
   }, [workspace, selected])
+
+  function editIdentity(kind: 'owner' | 'project') {
+    const current = kind === 'owner' ? ownerName : projectName
+    const input = window.prompt(kind === 'owner' ? 'Usuário/organização' : 'Nome do projeto', current)?.trim()
+    if (!input) return
+    if (kind === 'owner') {
+      setOwnerName(input)
+      window.localStorage.setItem('renderme-owner', input)
+    } else {
+      setProjectName(input)
+      window.localStorage.setItem('renderme-project', input)
+    }
+  }
 
   function mutate(mutator: (draft: Workspace) => void) {
     setWorkspace((current) => {
@@ -403,8 +418,7 @@ function App() {
       <aside className="workspace-sidebar" aria-label="Explorador de arquivos local">
         <div className="brand-row">
           <div>
-            <strong><img className="brand-logo" src={theme === 'dark' ? '/logo-dark.svg' : '/logo.svg'} alt="" /> renderme</strong>
-            <span>workspace local</span>
+            <strong>renderme</strong>
           </div>
           <div className="brand-actions">
             <button
@@ -419,10 +433,10 @@ function App() {
         </div>
 
         <div className="side-actions">
-          <button type="button" onClick={promptNewFile}><PlusIcon size={14} /> Novo arquivo</button>
-          <button type="button" onClick={promptNewFolder}><FileDirectoryIcon size={14} /> Nova pasta</button>
-          <button type="button" onClick={() => fileInput.current?.click()}><UploadIcon size={14} /> Upload arquivo</button>
-          <button type="button" onClick={() => folderInput.current?.click()}><UploadIcon size={14} /> Upload pasta</button>
+          <button type="button" onClick={promptNewFile}><PlusIcon size={14} /> Novo</button>
+          <button type="button" onClick={promptNewFolder}><FileDirectoryIcon size={14} /> Novo</button>
+          <button type="button" onClick={() => fileInput.current?.click()}><UploadIcon size={14} /> Upload</button>
+          <button type="button" onClick={() => folderInput.current?.click()}><UploadIcon size={14} /> Upload</button>
           <button type="button" onClick={() => zipInput.current?.click()}><BookIcon size={14} /> Importar ZIP</button>
           <button type="button" className="primary" onClick={exportZip}><DownloadIcon size={14} /> Exportar ZIP</button>
         </div>
@@ -465,9 +479,9 @@ function App() {
             <div className="repo-title-row">
               <div className="repo-title">
                 <RepoIcon size={16} />
-                <a href="#owner">horizzon3507</a>
+                <button type="button" className="identity-link" onClick={() => editIdentity('owner')}>{ownerName}</button>
                 <span>/</span>
-                <a href="#repo" className="repo-name">renderme</a>
+                <button type="button" className="identity-link repo-name" onClick={() => editIdentity('project')}>{projectName}</button>
                 <span className="visibility">Public</span>
               </div>
               <div className="repo-actions">
@@ -504,7 +518,7 @@ function App() {
 
                 <div className="file-table">
                   <div className="file-table-header">
-                    <div className="committer"><span className="mini-avatar">H</span><strong>horizzon3507</strong><span>local preview</span></div>
+                    <div className="committer"><span className="mini-avatar">{ownerName.slice(0, 1).toUpperCase()}</span><strong>{ownerName}</strong><span>local preview</span></div>
                     <span className="commit-count"><HistoryIcon size={13} /> <strong>{count}</strong> Commits</span>
                   </div>
                   {tree.map((node) => (

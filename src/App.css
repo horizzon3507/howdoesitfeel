@@ -131,7 +131,6 @@
 }
 
 .side-actions .primary {
-  grid-column: span 2;
   color: white;
   background: #238636;
   border-color: rgba(240, 246, 252, 0.1);
@@ -1113,4 +1112,32 @@
   margin-right: 7px;
   border-radius: 6px;
   vertical-align: -5px;
+}
+
+.identity-link {
+  padding: 0;
+  border: 0;
+  color: #4493f8;
+  background: transparent;
+  font: inherit;
+}
+
+.identity-link:hover {
+  text-decoration: underline;
+}
+
+[data-theme='light'] .identity-link {
+  color: #0969da;
+}
+
+.markdown-alert-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.markdown-alert-title svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
 }
