@@ -8,8 +8,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: renderme-production-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,6 +26,9 @@ jobs:
 
       - run: npm ci
       - run: npm run build
+
+      - name: Verify main tip
+        run: test "$(git ls-remote origin refs/heads/main | cut -f1)" = "${{ github.sha }}"
 
       - uses: cloudflare/wrangler-action@v3
         with:
