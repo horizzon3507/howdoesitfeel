@@ -134,6 +134,55 @@ function initialTheme(): ThemeName {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
+
+type JsdelivrNode = {
+  type: string
+  name: string
+  files?: JsdelivrNode[]
+}
+
+type JsdelivrTree = {
+  files: JsdelivrNode[]
+}
+
+function parseRepositoryReference(input: string) {
+  const clean = input.trim()
+    .replace(/^https?:\/\/(www\.)?github\.com\//i, '')
+    .replace(/\.git$/i, '')
+    .replace(/[?#].*$/, '')
+    .replace(/^\/+|\/+$/g, '')
+  const treeMatch = clean.match(/^([^/\s]+)\/([^/\s]+)\/tree\/(.+)$/i)
+  if (treeMatch) return { owner: treeMatch[1], repo: treeMatch[2], branch: treeMatch[3] }
+  const at = clean.lastIndexOf('@')
+  const target = at >= 0 ? clean.slice(0, at) : clean
+  const branch = at >= 0 ? clean.slice(at + 1) : ''
+  const [owner, repo] = target.split('/').filter(Boolean)
+  if (!owner || !repo) return null
+  return { owner, repo, branch }
+}
+
+async function fetchRepositoryTree(owner: string, repo: string, branch: string): Promise<JsdelivrTree | null> {
+  try {
+    const response = await fetch(`https://data.jsdelivr.com/v1/packages/gh/${owner}/${repo}@${encodeURIComponent(branch)}`)
+    return response.ok ? await response.json() : null
+  } catch {
+    return null
+  }
+}
+
+function flattenRepositoryFiles(nodes: JsdelivrNode[], prefix = ''): string[] {
+  return nodes.flatMap((node) => {
+    const path = normalizePath(prefix ? `${prefix}/${node.name}` : node.name)
+    if (!path) return []
+    if (node.type === 'directory') return flattenRepositoryFiles(node.files ?? [], path)
+    return [path]
+  })
+}
+
+function encodeRepositoryPath(path: string) {
+  return path.split('/').map(encodeURIComponent).join('/')
+}
+
 function App() {
   const [theme, setTheme] = useState<ThemeName>(initialTheme)
   const [ownerName, setOwnerName] = useState(() => window.localStorage.getItem('renderme-owner') || 'user')
@@ -376,37 +425,70 @@ function App() {
 
   async function importRepository() {
     const input = repoUrl.trim()
-    const match = input.match(/(?:github\.com\/)?([^/\s]+)\/([^/\s#?]+)/i)
-    if (!match || repoBusy) return
-    const [, owner, repo] = match
-    const name = repo.replace(/\.git$/i, '')
+    if (!input || repoBusy) return
     setRepoBusy(true)
     try {
-      const response = await fetch(`https://api.github.com/repos/${owner}/${name}/zipball`, {
-        headers: { Accept: 'application/vnd.github+json' },
-      })
-      if (!response.ok) throw new Error(`GitHub respondeu ${response.status}`)
-      const zip = await JSZip.loadAsync(await response.blob())
-      const entries: WorkspaceEntry[] = []
-      for (const [path, item] of Object.entries(zip.files)) {
-        const clean = normalizePath(path)
-        const relative = clean.split('/').slice(1).join('/')
-        if (!relative || relative.includes('__MACOSX')) continue
-        if (item.dir) entries.push({ path: relative, type: 'dir', updatedAt: Date.now() })
-        else entries.push(await entryFromZipItem(relative, item))
+      const reference = parseRepositoryReference(input)
+      if (!reference) throw new Error('Use owner/repo, owner/repo@branch ou uma URL do GitHub.')
+      const { owner, repo } = reference
+      let branch = reference.branch
+      let tree: JsdelivrTree | null = null
+
+      if (!branch) {
+        try {
+          const metaResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}`)
+          if (metaResponse.ok) branch = (await metaResponse.json()).default_branch
+        } catch {
+          // jsDelivr fallbacks below still work when GitHub API rate limits anonymous browsers.
+        }
       }
-      if (!workspaceRef.current || !entries.length) return
-      const conflicts = entries.filter((entry) => entry.type === 'file' && workspaceRef.current?.[entry.path])
+      if (branch) tree = await fetchRepositoryTree(owner, repo, branch)
+      if (!tree) {
+        for (const candidate of ['main', 'master']) {
+          tree = await fetchRepositoryTree(owner, repo, candidate)
+          if (tree) {
+            branch = candidate
+            break
+          }
+        }
+      }
+      if (!tree || !branch) throw new Error('Não encontrei a branch padrão. Use owner/repo@branch.')
+
+      const paths = flattenRepositoryFiles(tree.files)
+      if (!paths.length) throw new Error('O repositório não retornou arquivos importáveis.')
+      if (paths.length > 1000) throw new Error('Repositório grande demais para importar pelo navegador (limite: 1000 arquivos).')
+
+      const entries: WorkspaceEntry[] = []
+      let cursor = 0
+      const workers = Array.from({ length: Math.min(8, paths.length) }, async () => {
+        while (cursor < paths.length) {
+          const path = paths[cursor]
+          cursor += 1
+          const response = await fetch(`https://cdn.jsdelivr.net/gh/${owner}/${repo}@${encodeURIComponent(branch)}/${encodeRepositoryPath(path)}`)
+          if (!response.ok) throw new Error(`Não foi possível baixar ${path}.`)
+          const bytes = new Uint8Array(await response.arrayBuffer())
+          const mime = guessMime(path)
+          const content = isProbablyText(path, mime) ? decodeTextBytes(bytes) : null
+          entries.push({
+            path,
+            type: 'file',
+            content: content ?? undefined,
+            data: toBase64(bytes),
+            mime,
+            updatedAt: Date.now(),
+          })
+        }
+      })
+      await Promise.all(workers)
+      if (!workspaceRef.current) return
+
+      const conflicts = entries.filter((entry) => workspaceRef.current?.[entry.path])
       const replaceExisting = conflicts.length > 0 && window.confirm(
         `O repositório contém ${conflicts.length} arquivo(s) que já existem. OK substitui os locais; Cancelar importa com novos nomes.`,
       )
       const draft = { ...workspaceRef.current }
       const finalPaths = new Map<string, string>()
       for (const entry of entries) {
-        if (entry.type === 'dir') {
-          createDir(draft, entry.path)
-          continue
-        }
         let finalPath = entry.path
         if (draft[finalPath] && !replaceExisting) finalPath = uniquePath(draft, finalPath)
         const parent = dirname(finalPath)
@@ -417,7 +499,7 @@ function App() {
       workspaceRef.current = draft
       setWorkspace(draft)
       saveWorkspace(draft)
-      const readme = entries.find((entry) => /(^|\/)readme\.md$/i.test(entry.path))
+      const readme = entries.find((entry) => /(^|\/)readme\.md$/i.test(entry.path)) ?? entries.find((entry) => /(^|\/)readme$/i.test(entry.path))
       if (readme) {
         setSelectedPath(finalPaths.get(readme.path) ?? readme.path)
         setMode('preview')
